@@ -58,6 +58,9 @@ class RandomAgent(Agent):
     def load(self, filename):
         pass
 
+    def __str__(self):
+        return "random-agent"
+
 class NaiveAgent(Agent):
 
     def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
@@ -171,3 +174,6 @@ class NaiveAgent(Agent):
 
         self.__model = Model(inputs=inputs, outputs=action)
         self.__model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+
+    def __str__(self):
+        return "naive-agent"
