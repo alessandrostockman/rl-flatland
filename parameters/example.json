@@ -12,9 +12,10 @@
         "tree_depth": 2,
         "radius": 10
     },
-    "expl": {
+    "exp": {
         "start": 1.0,
         "end": 0.01,
         "decay": 0.997
-    }
+    },
+    "trn": {}
 }
