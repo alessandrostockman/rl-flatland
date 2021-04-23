@@ -1,11 +1,11 @@
 {
     "env": {
-        "n_agents": 5,
+        "n_agents": 1,
         "x_dim": 25,
         "y_dim": 25,
-        "n_cities": 4,
+        "n_cities": 2,
         "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
+        "max_rails_in_city": 2,
         "seed": 42
     },
     "obs": {

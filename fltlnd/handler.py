@@ -11,7 +11,7 @@ from flatland.envs.schedule_generators import sparse_schedule_generator
 from flatland.utils.rendertools import RenderTool
 from flatland.envs.observations import TreeObsForRailEnv
 
-from fltlnd.agent import RandomAgent
+from fltlnd.agent import RandomAgent, NaiveAgent
 from fltlnd.obs.utils import split_tree_into_feature_groups, norm_obs_clip 
 
 class ExcHandler:
@@ -31,7 +31,7 @@ class ExcHandler:
         # The action space of flatland is 5 discrete actions
         self.__action_size = 5 
         self.__state_size = self.__obs_handler.get_state_size()
-        self.__policy = RandomAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params)
+        self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params)
 
     def start(self, n_episodes):
         # And some variables to keep track of the progress
@@ -153,7 +153,7 @@ class EnvHandler:
             rail_generator=sparse_rail_generator(
                 max_num_cities=self.__params['n_cities'],
                 seed=self.__params['seed'],
-                grid_mode=False,
+                grid_mode=True,
                 max_rails_between_cities=self.__params['max_rails_between_cities'],
                 max_rails_in_city=self.__params['max_rails_in_city']
             ),

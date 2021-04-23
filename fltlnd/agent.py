@@ -60,8 +60,33 @@ class RandomAgent(Agent):
 
 class NaiveAgent(Agent):
 
+    def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
+        self.__state_size = state_size
+        self.__action_size = action_size
+        self.__exp_params = exp_params
+        self.__trn_params = trn_params
+        self.__create()
+
+        self.__optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
+        self.__state_history = []
+        self.__eps_start = self.__exp_params['start']
+        self.__eps_end = self.__exp_params['end']
+        self.__eps_decay = self.__exp_params['decay']
+        self.__eps = self.__exp_params['start']
+
+        self.__action_history = []
+        self.__state_history = []
+        self.__state_next_history = []
+        self.__done_history = []
+        self.__rewards_history = []
+
+        self.__loss = keras.losses.Huber()
+
     def act(self, obs):
-        if self.__eps_start > np.random.rand(1)[0]:
+        # Decay probability of taking random action
+        self.__eps = max(self.__eps_end, self.__eps_decay * self.__eps)
+
+        if self.__eps > np.random.rand(1)[0]:
             action = np.random.choice(self.__action_size)
         else:
             state_tensor = tf.convert_to_tensor(obs)
@@ -71,8 +96,53 @@ class NaiveAgent(Agent):
         return action
 
     def step(self, obs, action, reward, next_obs, done):
-        #TODO: Implement
-        pass
+        # Save actions and states in replay buffer
+        self.__action_history.append(action)
+        self.__state_history.append(obs)
+        self.__state_next_history.append(next_obs)
+        self.__done_history.append(done)
+        self.__rewards_history.append(reward)
+
+        # Get indices of samples for replay buffers
+        batch_size = 32
+        indices = np.random.choice(range(len(self.__done_history)), size=batch_size)
+
+        # Using list comprehension to sample from replay buffer
+        state_sample = np.array([self.__state_history[i] for i in indices])
+        state_next_sample = np.array([self.__state_next_history[i] for i in indices])
+        rewards_sample = [self.__rewards_history[i] for i in indices]
+        action_sample = [self.__action_history[i] for i in indices]
+        done_sample = tf.convert_to_tensor(
+            [float(self.__done_history[i]) for i in indices]
+        )
+
+        # Build the updated Q-values for the sampled future states
+        # Use the target model for stability
+        future_rewards = self.__model.predict(state_next_sample)
+        # Q value = reward + discount factor * expected future reward
+        gamma = 0.99
+        updated_q_values = rewards_sample + gamma * tf.reduce_max(
+            future_rewards, axis=1
+        )
+
+        # If final frame set the last value to -1
+        updated_q_values = updated_q_values * (1 - done_sample) - done_sample
+
+        # Create a mask so we only calculate loss on the updated Q-values
+        masks = tf.one_hot(action_sample, 5) #TODO: actions number
+
+        with tf.GradientTape() as tape:
+            # Train the model on the states and updated Q-values
+            q_values = self.__model(state_sample)
+
+            # Apply the masks to the Q-values to get the Q-value for action taken
+            q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
+            # Calculate loss between new Q-value and old Q-value
+            loss = self.__loss(updated_q_values, q_action)
+
+        # Backpropagation
+        grads = tape.gradient(loss, self.__model.trainable_variables)
+        self.__optimizer.apply_gradients(zip(grads, self.__model.trainable_variables))
 
     def load(self, filename):
         self.__model = keras.models.load_model(filename)
@@ -80,10 +150,9 @@ class NaiveAgent(Agent):
     def save(self, filename):
         self.__model.save(filename)
 
-    def __create_q_model(self):
-        self.__eps_start = 0 #TODO
-
-        inputs = layers.Input(shape=(self.__state_size))
+    def __create(self):
+        print(self.__state_size)
+        inputs = layers.Input(shape=(self.__state_size,))
         layer1 = layers.Dense(32, activation="relu")(inputs)
         action = layers.Dense(self.__action_size, activation="linear")(layer1)
 
@@ -101,3 +170,4 @@ class NaiveAgent(Agent):
         # action = layers.Dense(num_actions, activation="linear")(layer5)
 
         self.__model = Model(inputs=inputs, outputs=action)
+        self.__model.compile(optimizer="Adam", loss="mse", metrics=["mae"])

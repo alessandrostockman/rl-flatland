@@ -3,7 +3,6 @@ import time
 import json
 
 from fltlnd.handler import ExcHandler
-#TODO -> from flt.handler import ExcHandler
 
 def main(episodes, parameters_filename, training, rendering, interactive):
     with open(parameters_filename) as json_file:
