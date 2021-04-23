@@ -29,7 +29,7 @@ class ExcHandler:
         self.__env_handler = EnvHandler(self.__env_params, self.__obs_handler.builder, self.__rendering)
 
         # The action space of flatland is 5 discrete actions
-        self.__action_size = 5 
+        self.__action_size = 5
         self.__state_size = self.__obs_handler.get_state_size()
         self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params)
 

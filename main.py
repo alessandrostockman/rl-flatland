@@ -7,19 +7,6 @@ from fltlnd.handler import ExcHandler
 def main(episodes, parameters_filename, training, rendering, interactive):
     with open(parameters_filename) as json_file:
         parameters = json.load(json_file)
-        # TODO Add to parameters:
-        #
-        #    "train": {
-        #        'buffer_size': int(1e5),
-        #        'batch_size': 32,
-        #        'update_every': 8,
-        #        'learning_rate': 0.5e-4,
-        #        'tau': 1e-3,
-        #        'gamma': 0.99,
-        #        'buffer_min_size': 0,
-        #        'hidden_size': 256,
-        #        'use_gpu': False
-        #    }
 
     ex = ExcHandler(parameters, training, rendering, interactive)
     ex.start(episodes)
