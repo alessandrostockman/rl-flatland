@@ -12,7 +12,8 @@ from flatland.utils.rendertools import RenderTool
 from flatland.envs.observations import TreeObsForRailEnv
 
 from fltlnd.agent import RandomAgent, NaiveAgent
-from fltlnd.obs.utils import split_tree_into_feature_groups, norm_obs_clip 
+from fltlnd.obs.utils import split_tree_into_feature_groups, norm_obs_clip
+
 
 class ExcHandler:
     def __init__(self, params, training=True, rendering=False, interactive=False):
@@ -33,19 +34,21 @@ class ExcHandler:
         self.__state_size = self.__obs_handler.get_state_size()
         self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params)
 
+        # variables to keep track of the progress
+        self.__scores_window = deque(maxlen=100)  # todo smooth when rendering instead
+        self.__completion_window = deque(maxlen=100)
+        self.__scores = []
+        self.__completion = []
+        self.__update_values = False
+
+        # Max number of steps per episode
+        self.__max_steps = int(4 * 2 * (self.__env_params['x_dim'] + self.__env_params['y_dim'] + (
+                self.__env_params['n_agents'] / self.__env_params['n_cities'])))
+
     def start(self, n_episodes):
-        # And some variables to keep track of the progress
-        # scores_window = deque(maxlen=100)  # todo smooth when rendering instead
-        # completion_window = deque(maxlen=100)
-        # scores = []
-        # completion = []
-        # update_values = False
 
         random.seed(self.__env_params['seed'])
         np.random.seed(self.__env_params['seed'])
-
-        # Max number of steps per episode
-        self.max_steps = int(4 * 2 * (self.__env_params['x_dim'] + self.__env_params['y_dim'] + (self.__env_params['n_agents'] / self.__env_params['n_cities']))) 
 
         self.run_episodes(n_episodes)
 
@@ -67,20 +70,8 @@ class ExcHandler:
                     agent_obs[agent] = self.__obs_handler.normalize(obs[agent])
                     agent_prev_obs[agent] = agent_obs[agent].copy()
 
-
-            # Epsilon decay
-            eps_start = max(self.__exp_params['end'], self.__exp_params['decay'] * self.__exp_params['start'])
-
-            # Collection information about training TODO: ???
-            # tasks_finished = np.sum([int(done[idx]) for idx in env.get_agent_handles()])
-            # completion_window.append(tasks_finished / max(1, env.get_num_agents()))
-            # scores_window.append(score / (max_steps * env.get_num_agents()))
-            # completion.append((np.mean(completion_window)))
-            # scores.append(np.mean(scores_window))
-            # action_probs = action_count / np.sum(action_count)
-
             # Run episode
-            for step in range(self.max_steps - 1):
+            for step in range(self.__max_steps - 1):
                 for agent in self.__env_handler.env.get_agent_handles():
                     if info['action_required'][agent]:
                         # If an action is required, we want to store the obs at that step as well as the action
@@ -115,32 +106,32 @@ class ExcHandler:
                 if done['__all__']:
                     break
 
-                if episode_idx % 100 == 0:
-                    end = "\n"
-                    self.__policy.save('./checkpoints/' + str(self.__policy) + '-' + str(episode_idx) + '.pth')
-                    action_count = [1] * self.__action_size
-                else:
-                    end = " "
+            # Collection information about training TODO: ???
+            tasks_finished = np.sum([int(done[idx]) for idx in self.__env_handler.env.get_agent_handles()])
+            self.__completion_window.append(tasks_finished / max(1, self.__env_handler.env.get_num_agents()))
+            self.__scores_window.append(score / (self.__max_steps * self.__env_handler.env.get_num_agents()))
+            self.__completion.append((np.mean(self.__completion_window)))
+            self.__scores.append(np.mean(self.__scores_window))
+            action_probs = action_count / np.sum(action_count)
 
-                #print(
-                #    '\rTraining {} agents on {}x{}\t Episode {}\t Average Score: {:.3f}\tDones: {:.2f}%\tEpsilon: {:.2f} \t Action Probabilities: \t {}'.format(
-                #        env.get_num_agents(),
-                #        env.parameters['x_dim'], env.parameters['y_dim'],
-                #        episode_idx,
-                #        np.mean(scores_window),
-                #        100 * np.mean(completion_window),
-                #        parameters['expl']['start'],
-                #        action_probs
-                #    ), end=end)
-            
+            if episode_idx % 100 == 0:
+                end = "\n"
+                self.__policy.save('./checkpoints/' + str(self.__policy) + '-' + str(episode_idx) + '.pth')
+                action_count = [1] * self.__action_size
+            else:
+                end = " "
+
+            # print training agent status (new function)
+            self.__env_handler.print_results(episode_idx, self.__scores_window, self.__completion_window,
+                                             action_probs, end)
+
         # Plot overall training progress at the end
-        plt.plot(scores)
+        plt.plot(self.__scores)
         plt.show()
 
-        plt.plot(completion)
+        plt.plot(self.__completion)
         plt.show()
 
-        import keyboard as kb
 
 class EnvHandler:
     def __init__(self, params, obs_builder, rendering=False):
@@ -164,8 +155,21 @@ class EnvHandler:
 
         self.__renderer = RenderTool(self.env)
 
+    def print_results(self, episode_idx, scores_window, completion_window, action_probs, end):
+        print(
+            '\rTraining {} agents on {}x{}\t Episode {}\t Average Score: {:.3f}\tDones: {:.2f}%\t '
+            'Action Probabilities: \t {}'.format(
+                self.env.get_num_agents(),
+                self.__params['x_dim'], self.__params['y_dim'],
+                episode_idx,
+                np.mean(scores_window),
+                100 * np.mean(completion_window),
+                # self.__parameters['expl']['start'] to print epsilon,
+                action_probs,
+            ), end=end)
+
     def step(self, action_dict):
-        #TODO: If interactive mode wait for input 
+        # TODO: If interactive mode wait for input
         next_obs, all_rewards, done, info = self.env.step(action_dict)
 
         if self.__rendering:
@@ -175,20 +179,21 @@ class EnvHandler:
 
     def reset(self):
         obs, info = self.env.reset(True, True)
-        #TODO: Oppure env.reset(regenerate_rail=True, regenerate_schedule=True)
-        
+        # TODO: Oppure env.reset(regenerate_rail=True, regenerate_schedule=True)
+
         if self.__rendering:
             self.__renderer.reset()
         return obs, info
 
         import numpy as np
 
+
 class ObsHandler:
     def __init__(self, parameters):
         self.parameters = parameters
         self.builder = TreeObsForRailEnv(max_depth=parameters['tree_depth'])
 
-    def get_state_size(self,):
+    def get_state_size(self, ):
         # Calculate the state size given the depth of the tree observation and the number of features
         n_features_per_node = self.builder.observation_dim
         n_nodes = 0
@@ -204,4 +209,3 @@ class ObsHandler:
         agent_data = np.clip(agent_data, -1, 1)
         normalized_obs = np.concatenate((np.concatenate((data, distance)), agent_data))
         return normalized_obs
-
