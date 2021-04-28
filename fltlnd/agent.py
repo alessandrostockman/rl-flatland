@@ -118,14 +118,15 @@ class NaiveAgent(Agent):
 
     def step(self, obs, action, reward, next_obs, done):
         self.__frame_count += 1
-        if self.__frame_count % self.__update_every == 0 and len(self.__done_history) > self.__buffer_min_size:
-            # Save actions and states in replay buffer
-            self.__action_history.append(action)
-            self.__state_history.append(obs)
-            self.__state_next_history.append(next_obs)
-            self.__done_history.append(done)
-            self.__rewards_history.append(reward)
 
+        # Save actions and states in replay buffer
+        self.__action_history.append(action)
+        self.__state_history.append(obs)
+        self.__state_next_history.append(next_obs)
+        self.__done_history.append(done)
+        self.__rewards_history.append(reward)
+
+        if self.__frame_count % self.__update_every == 0 and len(self.__done_history) > self.__buffer_min_size:
             # Get indices of samples for replay buffers
             indices = np.random.choice(range(len(self.__done_history)), size=self.__batch_size)
 
