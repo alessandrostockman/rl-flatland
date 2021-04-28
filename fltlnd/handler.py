@@ -113,10 +113,9 @@ class ExcHandler:
             self.__completion.append((np.mean(self.__completion_window)))
             self.__scores.append(np.mean(self.__scores_window))
             action_probs = action_count / np.sum(action_count)
-
             if episode_idx % 100 == 0:
                 end = "\n"
-                self.__policy.save('./checkpoints/' + str(self.__policy) + '-' + str(episode_idx) + '.pth')
+                self.__policy.save('./checkpoints/' + str(self.__policy) + '-' + str(episode_idx) + '.pth/')
                 action_count = [1] * self.__action_size
             else:
                 end = " "
