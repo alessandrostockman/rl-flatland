@@ -16,7 +16,7 @@ from fltlnd.obs.utils import split_tree_into_feature_groups, norm_obs_clip
 
 
 class ExcHandler:
-    def __init__(self, params, training=True, rendering=False, interactive=False):
+    def __init__(self, params, training=True, rendering=False, interactive=False, checkpoint=None):
         self.__env_params = params['env']
         self.__obs_params = params['obs']
         self.__exp_params = params['exp']
@@ -32,7 +32,8 @@ class ExcHandler:
         # The action space of flatland is 5 discrete actions
         self.__action_size = 5
         self.__state_size = self.__obs_handler.get_state_size()
-        self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params)
+
+        self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params, checkpoint)
 
         # variables to keep track of the progress
         self.__scores_window = deque(maxlen=100)  # todo smooth when rendering instead
@@ -69,9 +70,10 @@ class ExcHandler:
                 if obs[agent]:
                     agent_obs[agent] = self.__obs_handler.normalize(obs[agent])
                     agent_prev_obs[agent] = agent_obs[agent].copy()
-
+            count_steps = 0
             # Run episode
             for step in range(self.__max_steps - 1):
+                count_steps += 1
                 for agent in self.__env_handler.env.get_agent_handles():
                     if info['action_required'][agent]:
                         # If an action is required, we want to store the obs at that step as well as the action
@@ -106,6 +108,8 @@ class ExcHandler:
                 if done['__all__']:
                     break
 
+            self.__policy.episode_end()
+
             # Collection information about training TODO: ???
             tasks_finished = np.sum([int(done[idx]) for idx in self.__env_handler.env.get_agent_handles()])
             self.__completion_window.append(tasks_finished / max(1, self.__env_handler.env.get_num_agents()))
@@ -120,6 +124,8 @@ class ExcHandler:
             else:
                 end = " "
 
+            #print("\n", done, "\n", self.__policy.eps)
+            #print(count_steps)
             # print training agent status (new function)
             self.__env_handler.print_results(episode_idx, self.__scores_window, self.__completion_window,
                                              action_probs, end)

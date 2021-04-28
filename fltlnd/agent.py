@@ -10,6 +10,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import Model
 
+
 class Agent:
 
     def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
@@ -20,8 +21,8 @@ class Agent:
 
         if checkpoint is None:
             self.__create()
-            #self.__model = self.__create_q_model(state_size, action_size)
-        else: 
+            # self.__model = self.__create_q_model(state_size, action_size)
+        else:
             self.load(checkpoint)
 
     def __create(self):
@@ -61,6 +62,7 @@ class RandomAgent(Agent):
     def __str__(self):
         return "random-agent"
 
+
 class NaiveAgent(Agent):
 
     def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
@@ -70,17 +72,17 @@ class NaiveAgent(Agent):
 
         self.__eps_end = exp_params['end']
         self.__eps_decay = exp_params['decay']
-        self.__eps = exp_params['start']
-        
+        self.eps = exp_params['start']
+
         self.__memory_size = trn_params['memory_size']
         self.__batch_size = trn_params['batch_size']
         self.__update_every = trn_params['update_every']
         self.__learning_rate = trn_params['learning_rate']
-        self.__tau = trn_params['tau'] # TODO Capire se serve
+        self.__tau = trn_params['tau']  # TODO Capire se serve
         self.__gamma = trn_params['gamma']
         self.__buffer_min_size = trn_params['batch_size']
-        self.__hidden_size = trn_params['hidden_size'] # TODO Hidden size of the DDDQN???
-        self.__use_gpu = trn_params['use_gpu'] # TODO: always true
+        self.__hidden_size = trn_params['hidden_size']  # TODO Hidden size of the DDDQN???
+        self.__use_gpu = trn_params['use_gpu']  # TODO: always true
 
         self.__frame_count = 0
 
@@ -93,13 +95,14 @@ class NaiveAgent(Agent):
         self.__loss = keras.losses.Huber()
         self.__optimizer = keras.optimizers.Adam(learning_rate=self.__learning_rate, clipnorm=1.0)
 
-        self.__create()
+        if checkpoint is None:
+            self.__create()
+        else:
+            self.load(checkpoint)
 
     def act(self, obs):
-        # Decay probability of taking random action
-        self.__eps = max(self.__eps_end, self.__eps_decay * self.__eps)
 
-        if self.__eps > np.random.rand(1)[0]:
+        if self.eps > np.random.rand(1)[0]:
             action = np.random.choice(self.__action_size)
         else:
             state_tensor = tf.convert_to_tensor(obs)
@@ -107,6 +110,11 @@ class NaiveAgent(Agent):
             action_probs = self.__model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.eps = max(self.__eps_end, self.__eps_decay * self.eps)
+
 
     def step(self, obs, action, reward, next_obs, done):
         self.__frame_count += 1
@@ -157,12 +165,12 @@ class NaiveAgent(Agent):
             grads = tape.gradient(loss, self.__model.trainable_variables)
             self.__optimizer.apply_gradients(zip(grads, self.__model.trainable_variables))
 
-        if self.__frame_count % 10000 == 0: #TODO update_target_network as parameter
+        if self.__frame_count % 10000 == 0:  # TODO update_target_network as parameter
             # update the the target network with new weights
             self.__model_target.set_weights(self.__model.get_weights())
             # Log details
-            #template = "running reward: {:.2f} at episode {}, frame count {}"
-            #print(template.format(running_reward, episode_count, frame_count))
+            # template = "running reward: {:.2f} at episode {}, frame count {}"
+            # print(template.format(running_reward, episode_count, frame_count))
 
         # Limit the state and reward history
         if len(self.__rewards_history) > self.__memory_size:
@@ -174,6 +182,7 @@ class NaiveAgent(Agent):
 
     def load(self, filename):
         self.__model = keras.models.load_model(filename)
+        self.__create_target()
 
     def save(self, filename):
         self.__model.save(filename)
@@ -181,7 +190,8 @@ class NaiveAgent(Agent):
     def __create(self):
         print(self.__state_size)
         inputs = layers.Input(shape=(self.__state_size,))
-        layer1 = layers.Dense(32, activation="relu")(inputs)
+        layer1 = layers.Dense(128, activation="relu")(inputs)
+        layer2 = layers.Dense(128, activation="relu")(inputs)
         action = layers.Dense(self.__action_size, activation="linear")(layer1)
 
         # Network defined by the Deepmind paper
@@ -199,8 +209,15 @@ class NaiveAgent(Agent):
 
         self.__model = Model(inputs=inputs, outputs=action)
         self.__model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
-        self.__model_target = Model(inputs=inputs, outputs=action)
-        self.__model_target.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+
+        self.__create_target()
+
+    def __create_target(self):
+
+        self.__model_target = keras.models.clone_model(self.__model)
+        self.__model_target.build((None, 10))  # replace 10 with number of variables in input layer
+        self.__model_target.compile(optimizer='Adam', loss='mse', metrics=["mae"])
+        self.__model_target.set_weights(self.__model.get_weights())
 
     def __str__(self):
         return "naive-agent"
