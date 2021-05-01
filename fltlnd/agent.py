@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import numpy as np
 
 from flatland.envs.rail_env import RailEnv
@@ -11,44 +12,49 @@ from tensorflow.keras import layers
 from tensorflow.keras import Model
 
 
-class Agent:
+class Agent(ABC):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
-        self.__state_size = state_size
-        self.__action_size = action_size
-        self.__exp_params = exp_params
-        self.__trn_params = trn_params
+    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None):
+        self._state_size = state_size
+        self._action_size = action_size
+        self._exp_params = exp_params
+        self._trn_params = trn_params
+        self._pol_params = pol_params
 
         if checkpoint is None:
-            self.__create()
-            # self.__model = self.__create_q_model(state_size, action_size)
+            self.create()
         else:
             self.load(checkpoint)
 
-    def __create(self):
+    @abstractmethod
+    def create(self):
         pass
 
+    @abstractmethod
     def act(self, obs):
         pass
 
+    @abstractmethod
     def step(self, obs, action, reward, next_obs, done):
         pass
 
+    @abstractmethod
     def save(self, filename):
         pass
 
+    @abstractmethod
     def load(self, filename):
+        pass
+
+    @abstractmethod
+    def __str__(self):
         pass
 
 
 class RandomAgent(Agent):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params):
-        self.__state_size = state_size
-        self.__action_size = action_size
-
     def act(self, obs):
-        return np.random.choice(np.arange(self.__action_size))
+        return np.random.choice(np.arange(self._action_size))
 
     def step(self, obs, action, reward, next_obs, done):
         pass
@@ -65,85 +71,50 @@ class RandomAgent(Agent):
 
 class NaiveAgent(Agent):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params, checkpoint=None):
-        self.__state_size = state_size
-        self.__action_size = action_size
-        self.__trn_params = trn_params
-
-        self.__eps_end = exp_params['end']
-        self.__eps_decay = exp_params['decay']
-        self.eps = exp_params['start']
-
-        self.__memory_size = trn_params['memory_size']
-        self.__batch_size = trn_params['batch_size']
-        self.__update_every = trn_params['update_every']
-        self.__learning_rate = trn_params['learning_rate']
-        self.__tau = trn_params['tau']  # TODO Capire se serve
-        self.__gamma = trn_params['gamma']
-        self.__buffer_min_size = trn_params['batch_size']
-        self.__hidden_size = trn_params['hidden_size']  # TODO Hidden size of the DDDQN???
-        self.__use_gpu = trn_params['use_gpu']  # TODO: always true
-
-        self.__frame_count = 0
-
-        self.__action_history = []
-        self.__state_history = []
-        self.__state_next_history = []
-        self.__done_history = []
-        self.__rewards_history = []
-
-        self.__loss = keras.losses.Huber()
-        self.__optimizer = keras.optimizers.Adam(learning_rate=self.__learning_rate, clipnorm=1.0)
-
-        if checkpoint is None:
-            self.__create()
-        else:
-            self.load(checkpoint)
-
     def act(self, obs):
 
         if self.eps > np.random.rand(1)[0]:
-            action = np.random.choice(self.__action_size)
+            action = np.random.choice(self._action_size)
         else:
             state_tensor = tf.convert_to_tensor(obs)
             state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = self.__model(state_tensor, training=False)
+            action_probs = self._model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
 
     def episode_end(self):
         # Decay probability of taking random action
-        self.eps = max(self.__eps_end, self.__eps_decay * self.eps)
+        self.eps = max(self._eps_end, self._eps_decay * self.eps)
 
 
     def step(self, obs, action, reward, next_obs, done):
-        self.__frame_count += 1
+        self._frame_count += 1
 
         # Save actions and states in replay buffer
-        self.__action_history.append(action)
-        self.__state_history.append(obs)
-        self.__state_next_history.append(next_obs)
-        self.__done_history.append(done)
-        self.__rewards_history.append(reward)
+        self._action_history.append(action)
+        self._state_history.append(obs)
+        self._state_next_history.append(next_obs)
+        self._done_history.append(done)
+        self._rewards_history.append(reward)
 
-        if self.__frame_count % self.__update_every == 0 and len(self.__done_history) > self.__buffer_min_size:
+        if self._frame_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
             # Get indices of samples for replay buffers
-            indices = np.random.choice(range(len(self.__done_history)), size=self.__batch_size)
+            indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
 
             # Using list comprehension to sample from replay buffer
-            state_sample = np.array([self.__state_history[i] for i in indices])
-            state_next_sample = np.array([self.__state_next_history[i] for i in indices])
-            rewards_sample = [self.__rewards_history[i] for i in indices]
-            action_sample = [self.__action_history[i] for i in indices]
+            state_sample = np.array([self._state_history[i] for i in indices])
+            state_next_sample = np.array([self._state_next_history[i] for i in indices])
+            rewards_sample = [self._rewards_history[i] for i in indices]
+            action_sample = [self._action_history[i] for i in indices]
             done_sample = tf.convert_to_tensor(
-                [float(self.__done_history[i]) for i in indices]
+                [float(self._done_history[i]) for i in indices]
             )
 
             # Build the updated Q-values for the sampled future states
             # Use the target model for stability
-            future_rewards = self.__model_target.predict(state_next_sample)
+            future_rewards = self._model_target.predict(state_next_sample)
             # Q value = reward + discount factor * expected future reward
-            updated_q_values = rewards_sample + self.__gamma * tf.reduce_max(
+            updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
                 future_rewards, axis=1
             )
 
@@ -151,49 +122,73 @@ class NaiveAgent(Agent):
             updated_q_values = updated_q_values * (1 - done_sample) - done_sample
 
             # Create a mask so we only calculate loss on the updated Q-values
-            masks = tf.one_hot(action_sample, self.__action_size)
+            masks = tf.one_hot(action_sample, self._action_size)
 
             with tf.GradientTape() as tape:
                 # Train the model on the states and updated Q-values
-                q_values = self.__model(state_sample)
+                q_values = self._model(state_sample)
 
                 # Apply the masks to the Q-values to get the Q-value for action taken
                 q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
                 # Calculate loss between new Q-value and old Q-value
-                loss = self.__loss(updated_q_values, q_action)
+                loss = self._loss(updated_q_values, q_action)
 
             # Backpropagation
-            grads = tape.gradient(loss, self.__model.trainable_variables)
-            self.__optimizer.apply_gradients(zip(grads, self.__model.trainable_variables))
+            grads = tape.gradient(loss, self._model.trainable_variables)
+            self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
 
-        if self.__frame_count % 10000 == 0:  # TODO update_target_network as parameter
+        if self._frame_count % 10000 == 0:  # TODO update_target_network as parameter
             # update the the target network with new weights
-            self.__model_target.set_weights(self.__model.get_weights())
+            self._model_target.set_weights(self._model.get_weights())
             # Log details
             # template = "running reward: {:.2f} at episode {}, frame count {}"
             # print(template.format(running_reward, episode_count, frame_count))
 
         # Limit the state and reward history
-        if len(self.__rewards_history) > self.__memory_size:
-            del self.__rewards_history[:1]
-            del self.__state_history[:1]
-            del self.__state_next_history[:1]
-            del self.__action_history[:1]
-            del self.__done_history[:1]
+        if len(self._rewards_history) > self._memory_size:
+            del self._rewards_history[:1]
+            del self._state_history[:1]
+            del self._state_next_history[:1]
+            del self._action_history[:1]
+            del self._done_history[:1]
 
     def load(self, filename):
-        self.__model = keras.models.load_model(filename)
-        self.__create_target()
+        self._model = keras.models.load_model(filename)
+        self.create_target()
 
     def save(self, filename):
-        self.__model.save(filename)
+        self._model.save(filename)
 
-    def __create(self):
-        print(self.__state_size)
-        inputs = layers.Input(shape=(self.__state_size,))
+    def create(self):
+        self._eps_end = self._exp_params['end']
+        self._eps_decay = self._exp_params['decay']
+        self.eps = self._exp_params['start']
+
+        self._memory_size = self._trn_params['memory_size']
+        self._batch_size = self._trn_params['batch_size']
+        self._update_every = self._trn_params['update_every']
+        self._learning_rate = self._trn_params['learning_rate']
+        self._tau = self._trn_params['tau']  # TODO Capire se serve
+        self._gamma = self._trn_params['gamma']
+        self._buffer_min_size = self._trn_params['batch_size']
+        self._hidden_size = self._trn_params['hidden_size']  # TODO Hidden size of the DDDQN???
+        self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
+
+        self._frame_count = 0
+
+        self._action_history = []
+        self._state_history = []
+        self._state_next_history = []
+        self._done_history = []
+        self._rewards_history = []
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        inputs = layers.Input(shape=(self._state_size,))
         layer1 = layers.Dense(128, activation="relu")(inputs)
         layer2 = layers.Dense(128, activation="relu")(inputs)
-        action = layers.Dense(self.__action_size, activation="linear")(layer1)
+        action = layers.Dense(self._action_size, activation="linear")(layer1)
 
         # Network defined by the Deepmind paper
         # inputs = layers.Input(shape=(84, 84, 4,))
@@ -208,17 +203,17 @@ class NaiveAgent(Agent):
         # layer5 = layers.Dense(512, activation="relu")(layer4)
         # action = layers.Dense(num_actions, activation="linear")(layer5)
 
-        self.__model = Model(inputs=inputs, outputs=action)
-        self.__model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+        self._model = Model(inputs=inputs, outputs=action)
+        self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
 
-        self.__create_target()
+        self.create_target()
 
-    def __create_target(self):
+    def create_target(self):
 
-        self.__model_target = keras.models.clone_model(self.__model)
-        self.__model_target.build((None, 10))  # replace 10 with number of variables in input layer
-        self.__model_target.compile(optimizer='Adam', loss='mse', metrics=["mae"])
-        self.__model_target.set_weights(self.__model.get_weights())
+        self._model_target = keras.models.clone_model(self._model)
+        self._model_target.build((None, 10))  # replace 10 with number of variables in input layer
+        self._model_target.compile(optimizer='Adam', loss='mse', metrics=["mae"])
+        self._model_target.set_weights(self._model.get_weights())
 
     def __str__(self):
         return "naive-agent"

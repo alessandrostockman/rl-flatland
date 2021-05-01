@@ -1,6 +1,7 @@
 import random
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 from collections import deque
 from pathlib import Path
@@ -9,47 +10,50 @@ from flatland.envs.rail_env import RailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 from flatland.utils.rendertools import RenderTool
-from flatland.envs.observations import TreeObsForRailEnv
 
-from fltlnd.agent import RandomAgent, NaiveAgent
-from fltlnd.obs.utils import split_tree_into_feature_groups, norm_obs_clip
+import fltlnd.agent as agent_classes
+import fltlnd.obs as obs_classes
 
 
 class ExcHandler:
     def __init__(self, params, training=True, rendering=False, interactive=False, checkpoint=None):
-        self.__env_params = params['env']
-        self.__obs_params = params['obs']
-        self.__exp_params = params['exp']
-        self.__trn_params = params['trn']
+        self._env_params = params['env'] # Environment
+        self._obs_params = params['obs'] # Observation
+        self._exp_params = params['exp'] # Exploration
+        self._trn_params = params['trn'] # Training
+        self._pol_params = params['pol'] # Policy
 
-        self.__training = training
-        self.__interactive = interactive
-        self.__rendering = rendering
+        self._training = training
+        self._interactive = interactive
+        self._rendering = rendering
 
-        self.__obs_handler = ObsHandler(self.__obs_params)
-        self.__env_handler = EnvHandler(self.__env_params, self.__obs_handler.builder, self.__rendering)
+        obs_class = getattr(obs_classes, self._obs_params['class'])
+        self._obs_wrapper = obs_class(self._obs_params)
+        self._env_handler = EnvHandler(self._env_params, self._obs_wrapper.builder, self._rendering)
 
         # The action space of flatland is 5 discrete actions
-        self.__action_size = 5
-        self.__state_size = self.__obs_handler.get_state_size()
+        self._action_size = 5
+        self._state_size = self._obs_wrapper.get_state_size()
 
-        self.__policy = NaiveAgent(self.__state_size, self.__action_size, self.__exp_params, self.__trn_params, checkpoint)
+        policy_class = getattr(agent_classes, self._pol_params['class'])
+        self._policy = policy_class(self._state_size, self._action_size, self._exp_params, self._trn_params, 
+            self._pol_params, checkpoint)
 
         # variables to keep track of the progress
-        self.__scores_window = deque(maxlen=100)  # todo smooth when rendering instead
-        self.__completion_window = deque(maxlen=100)
-        self.__scores = []
-        self.__completion = []
-        self.__update_values = False
+        self._scores_window = deque(maxlen=100)  # todo smooth when rendering instead
+        self._completion_window = deque(maxlen=100)
+        self._scores = []
+        self._completion = []
+        self._update_values = False
 
         # Max number of steps per episode
-        self.__max_steps = int(4 * 2 * (self.__env_params['x_dim'] + self.__env_params['y_dim'] + (
-                self.__env_params['n_agents'] / self.__env_params['n_cities'])))
+        self._max_steps = int(4 * 2 * (self._env_params['x_dim'] + self._env_params['y_dim'] + (
+                self._env_params['n_agents'] / self._env_params['n_cities'])))
 
     def start(self, n_episodes):
 
-        random.seed(self.__env_params['seed'])
-        np.random.seed(self.__env_params['seed'])
+        random.seed(self._env_params['seed'])
+        np.random.seed(self._env_params['seed'])
 
         self.run_episodes(n_episodes)
 
@@ -57,28 +61,28 @@ class ExcHandler:
         for episode_idx in range(n_episodes):
             score = 0
             action_dict = dict()
-            action_count = [0] * self.__action_size
-            agent_obs = [None] * self.__env_params['n_agents']
-            agent_prev_obs = [None] * self.__env_params['n_agents']
-            agent_prev_action = [2] * self.__env_params['n_agents']
+            action_count = [0] * self._action_size
+            agent_obs = [None] * self._env_params['n_agents']
+            agent_prev_obs = [None] * self._env_params['n_agents']
+            agent_prev_action = [2] * self._env_params['n_agents']
 
             # Reset environment
-            obs, info = self.__env_handler.reset()
+            obs, info = self._env_handler.reset()
 
             # Build agent specific observations
-            for agent in self.__env_handler.env.get_agent_handles():
+            for agent in self._env_handler.env.get_agent_handles():
                 if obs[agent]:
-                    agent_obs[agent] = self.__obs_handler.normalize(obs[agent])
+                    agent_obs[agent] = self._obs_wrapper.normalize(obs[agent])
                     agent_prev_obs[agent] = agent_obs[agent].copy()
             count_steps = 0
             # Run episode
-            for step in range(self.__max_steps - 1):
+            for step in range(self._max_steps - 1):
                 count_steps += 1
-                for agent in self.__env_handler.env.get_agent_handles():
+                for agent in self._env_handler.env.get_agent_handles():
                     if info['action_required'][agent]:
                         # If an action is required, we want to store the obs at that step as well as the action
                         update_values = True
-                        action = self.__policy.act(agent_obs[agent])
+                        action = self._policy.act(agent_obs[agent])
                         action_count[action] += 1
                     else:
                         update_values = False
@@ -86,13 +90,13 @@ class ExcHandler:
                     action_dict.update({agent: action})
 
                 # Environment step
-                next_obs, all_rewards, done, info = self.__env_handler.step(action_dict)
+                next_obs, all_rewards, done, info = self._env_handler.step(action_dict)
 
                 # Update replay buffer and train agent
-                for agent in range(self.__env_params['n_agents']):
+                for agent in range(self._env_params['n_agents']):
                     # Only update the values when we are done or when an action was taken and thus relevant information is present
                     if update_values or done[agent]:
-                        self.__policy.step(
+                        self._policy.step(
                             agent_prev_obs[agent], agent_prev_action[agent], all_rewards[agent],
                             agent_obs[agent], done[agent]
                         )
@@ -101,75 +105,75 @@ class ExcHandler:
                         agent_prev_action[agent] = action_dict[agent]
 
                     if next_obs[agent]:
-                        agent_obs[agent] = self.__obs_handler.normalize(next_obs[agent])
+                        agent_obs[agent] = self._obs_wrapper.normalize(next_obs[agent])
 
                     score += all_rewards[agent]
 
                 if done['__all__']:
                     break
 
-            self.__policy.episode_end()
+            self._policy.episode_end()
 
             # Collection information about training TODO: ???
-            tasks_finished = np.sum([int(done[idx]) for idx in self.__env_handler.env.get_agent_handles()])
-            self.__completion_window.append(tasks_finished / max(1, self.__env_handler.env.get_num_agents()))
-            self.__scores_window.append(score / (self.__max_steps * self.__env_handler.env.get_num_agents()))
-            self.__completion.append((np.mean(self.__completion_window)))
-            self.__scores.append(np.mean(self.__scores_window))
+            tasks_finished = np.sum([int(done[idx]) for idx in self._env_handler.env.get_agent_handles()])
+            self._completion_window.append(tasks_finished / max(1, self._env_handler.env.get_num_agents()))
+            self._scores_window.append(score / (self._max_steps * self._env_handler.env.get_num_agents()))
+            self._completion.append((np.mean(self._completion_window)))
+            self._scores.append(np.mean(self._scores_window))
             action_probs = action_count / np.sum(action_count)
-            if episode_idx % 100 == 0:
+            if episode_idx % self._pol_params['checkpoint_freq'] == 0:
                 end = "\n"
-                self.__policy.save('./checkpoints/' + str(self.__policy) + '-' + str(episode_idx) + '.pth/')
-                action_count = [1] * self.__action_size
+                self._policy.save(os.path.dirname('./checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/'))
+                action_count = [1] * self._action_size
             else:
                 end = " "
 
-            #print("\n", done, "\n", self.__policy.eps)
+            #print("\n", done, "\n", self._policy.eps)
             #print(count_steps)
             # print training agent status (new function)
-            self.__env_handler.print_results(episode_idx, self.__scores_window, self.__completion_window,
+            self._env_handler.print_results(episode_idx, self._scores_window, self._completion_window,
                                              action_probs, end)
 
         # Plot overall training progress at the end
-        plt.plot(self.__scores)
+        plt.plot(self._scores)
         plt.show()
 
-        plt.plot(self.__completion)
+        plt.plot(self._completion)
         plt.show()
 
 
 class EnvHandler:
     def __init__(self, params, obs_builder, rendering=False):
-        self.__params = params
-        self.__rendering = rendering
+        self._params = params
+        self._rendering = rendering
 
         self.env = RailEnv(
-            width=self.__params['x_dim'],
-            height=self.__params['y_dim'],
+            width=self._params['x_dim'],
+            height=self._params['y_dim'],
             rail_generator=sparse_rail_generator(
-                max_num_cities=self.__params['n_cities'],
-                seed=self.__params['seed'],
+                max_num_cities=self._params['n_cities'],
+                seed=self._params['seed'],
                 grid_mode=True,
-                max_rails_between_cities=self.__params['max_rails_between_cities'],
-                max_rails_in_city=self.__params['max_rails_in_city']
+                max_rails_between_cities=self._params['max_rails_between_cities'],
+                max_rails_in_city=self._params['max_rails_in_city']
             ),
             schedule_generator=sparse_schedule_generator(),
-            number_of_agents=self.__params['n_agents'],
+            number_of_agents=self._params['n_agents'],
             obs_builder_object=obs_builder
         )
 
-        self.__renderer = RenderTool(self.env)
+        self._renderer = RenderTool(self.env)
 
     def print_results(self, episode_idx, scores_window, completion_window, action_probs, end):
         print(
             '\rTraining {} agents on {}x{}\t Episode {}\t Average Score: {:.3f}\tDones: {:.2f}%\t '
             'Action Probabilities: \t {}'.format(
                 self.env.get_num_agents(),
-                self.__params['x_dim'], self.__params['y_dim'],
+                self._params['x_dim'], self._params['y_dim'],
                 episode_idx,
                 np.mean(scores_window),
                 100 * np.mean(completion_window),
-                # self.__parameters['expl']['start'] to print epsilon,
+                # self._parameters['expl']['start'] to print epsilon,
                 action_probs,
             ), end=end)
 
@@ -177,8 +181,8 @@ class EnvHandler:
         # TODO: If interactive mode wait for input
         next_obs, all_rewards, done, info = self.env.step(action_dict)
 
-        if self.__rendering:
-            self.__renderer.render_env(show=True, show_observations=True, show_predictions=False)
+        if self._rendering:
+            self._renderer.render_env(show=True, show_observations=True, show_predictions=False)
 
         return next_obs, all_rewards, done, info
 
@@ -186,31 +190,9 @@ class EnvHandler:
         obs, info = self.env.reset(True, True)
         # TODO: Oppure env.reset(regenerate_rail=True, regenerate_schedule=True)
 
-        if self.__rendering:
-            self.__renderer.reset()
+        if self._rendering:
+            self._renderer.reset()
         return obs, info
 
         import numpy as np
 
-
-class ObsHandler:
-    def __init__(self, parameters):
-        self.parameters = parameters
-        self.builder = TreeObsForRailEnv(max_depth=parameters['tree_depth'])
-
-    def get_state_size(self, ):
-        # Calculate the state size given the depth of the tree observation and the number of features
-        n_features_per_node = self.builder.observation_dim
-        n_nodes = 0
-        for i in range(self.parameters['tree_depth'] + 1):
-            n_nodes += np.power(4, i)
-        return n_features_per_node * n_nodes
-
-    def normalize(self, observation):
-        data, distance, agent_data = split_tree_into_feature_groups(observation, self.parameters['tree_depth'])
-
-        data = norm_obs_clip(data, fixed_radius=self.parameters['radius'])
-        distance = norm_obs_clip(distance, normalize_to_range=True)
-        agent_data = np.clip(agent_data, -1, 1)
-        normalized_obs = np.concatenate((np.concatenate((data, distance)), agent_data))
-        return normalized_obs
