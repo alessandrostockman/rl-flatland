@@ -135,10 +135,12 @@ class ExcHandler:
                                              action_probs, end)
 
         # Plot overall training progress at the end
-        plt.plot(self._scores)
+        plt.plot(self.__scores)
+        plt.title("Scores")
         plt.show()
 
-        plt.plot(self._completion)
+        plt.plot(self.__completion)
+        plt.title("Completions")
         plt.show()
 
 
