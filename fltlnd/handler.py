@@ -1,7 +1,6 @@
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from collections import deque
 from pathlib import Path
@@ -123,7 +122,7 @@ class ExcHandler:
             action_probs = action_count / np.sum(action_count)
             if episode_idx % self._pol_params['checkpoint_freq'] == 0:
                 end = "\n"
-                self._policy.save(os.path.dirname('./checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/'))
+                self._policy.save(self._pol_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
                 action_count = [1] * self._action_size
             else:
                 end = " "
