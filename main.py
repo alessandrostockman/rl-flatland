@@ -9,7 +9,7 @@ def main(episodes, parameters_filename, training, rendering, interactive, checkp
     with open(parameters_filename) as json_file:
         parameters = json.load(json_file)
 
-    ex = ExcHandler(parameters, training, rendering, interactive, checkpoint)
+    ex = ExcHandler(parameters, training == 'T', rendering, interactive, checkpoint)
     ex.start(episodes)
 
 
@@ -20,7 +20,8 @@ if __name__ == "__main__":
                         default='parameters/example.json')
     parser.add_argument('-R', '--rendering', dest="rendering", help="Renders the environment", default=False,
                         action='store_true')
-    parser.add_argument('-T', '--training', dest="training", help="Enables training", default=True, action='store_true')
+    parser.add_argument('-T', '--training', dest="training", help="Enables training", default="T", 
+                        choices=['T', 'F'])
     parser.add_argument('-I', '--interactive', dest="interactive", help="Executes in interactive mode", default=False,
                         action='store_true')
     parser.add_argument('-C', '--checkpoint', dest="checkpoint", help="Checkpoint file to be loaded", default=None)

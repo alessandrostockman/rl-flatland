@@ -14,12 +14,13 @@ from tensorflow.keras import Model
 
 class Agent(ABC):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None):
+    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None, exploration=True):
         self._state_size = state_size
         self._action_size = action_size
         self._exp_params = exp_params
         self._trn_params = trn_params
         self._pol_params = pol_params
+        self._exploration = exploration
 
         if checkpoint is None:
             self.create()
@@ -73,11 +74,11 @@ class RandomAgent(Agent):
         return "random-agent"
 
 
-class NaiveAgent(Agent):
+class SingleLayerAgent(Agent):
 
     def act(self, obs):
 
-        if self.eps > np.random.rand(1)[0]:
+        if self.eps > np.random.rand(1)[0] and self._exploration:
             action = np.random.choice(self._action_size)
         else:
             state_tensor = tf.convert_to_tensor(obs)
@@ -188,7 +189,7 @@ class NaiveAgent(Agent):
         self._tau = self._trn_params['tau']  # TODO Capire se serve
         self._gamma = self._trn_params['gamma']
         self._buffer_min_size = self._trn_params['batch_size']
-        self._hidden_size = self._trn_params['hidden_size']  # TODO Hidden size of the DDDQN???
+        self._hidden_size = self._trn_params['hidden_size']
         self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
         
     def create(self):
@@ -206,7 +207,7 @@ class NaiveAgent(Agent):
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         inputs = layers.Input(shape=(self._state_size,))
-        layer1 = layers.Dense(128, activation="relu")(inputs)
+        layer1 = layers.Dense(self._hidden_size, activation="relu")(inputs)
         action = layers.Dense(self._action_size, activation="linear")(layer1)
 
         self._model = Model(inputs=inputs, outputs=action)
@@ -217,7 +218,7 @@ class NaiveAgent(Agent):
     def create_target(self):
 
         self._model_target = keras.models.clone_model(self._model)
-        self._model_target.build((None, 10))  # replace 10 with number of variables in input layer
+        self._model_target.build((self._state_size,))
         self._model_target.compile(optimizer='Adam', loss='mse', metrics=["mae"])
         self._model_target.set_weights(self._model.get_weights())
 

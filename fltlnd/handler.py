@@ -36,7 +36,7 @@ class ExcHandler:
 
         policy_class = getattr(agent_classes, self._pol_params['class'])
         self._policy = policy_class(self._state_size, self._action_size, self._exp_params, self._trn_params, 
-            self._pol_params, checkpoint)
+            self._pol_params, checkpoint=checkpoint, exploration=training)
 
         # variables to keep track of the progress
         self._scores_window = deque(maxlen=100)  # todo smooth when rendering instead
@@ -94,7 +94,7 @@ class ExcHandler:
                 # Update replay buffer and train agent
                 for agent in range(self._env_params['n_agents']):
                     # Only update the values when we are done or when an action was taken and thus relevant information is present
-                    if update_values or done[agent]:
+                    if self._training and (update_values or done[agent]):
                         self._policy.step(
                             agent_prev_obs[agent], agent_prev_action[agent], all_rewards[agent],
                             agent_obs[agent], done[agent]
@@ -122,8 +122,10 @@ class ExcHandler:
             action_probs = action_count / np.sum(action_count)
             if episode_idx % self._pol_params['checkpoint_freq'] == 0:
                 end = "\n"
-                self._policy.save(self._pol_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
                 action_count = [1] * self._action_size
+
+                if self._training:
+                    self._policy.save(self._pol_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
             else:
                 end = " "
 

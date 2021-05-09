@@ -26,12 +26,12 @@
         "tau": 1e-3,
         "gamma": 0.99,
         "buffer_min_size": 0,
-        "hidden_size": 256,
+        "hidden_size": 128,
         "use_gpu": true
     },
     "pol": {
-        "class": "NaiveAgent",
-        "checkpoint_freq": 3,
+        "class": "SingleLayerAgent",
+        "checkpoint_freq": 100,
         "base_dir": ""
     }
 }
