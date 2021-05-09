@@ -31,6 +31,10 @@ class Agent(ABC):
         pass
 
     @abstractmethod
+    def init_params(self):
+        pass
+
+    @abstractmethod
     def act(self, obs):
         pass
 
@@ -153,13 +157,26 @@ class NaiveAgent(Agent):
             del self._done_history[:1]
 
     def load(self, filename):
+        self.init_params()
+
+        self._frame_count = 0
+
+        self._action_history = []
+        self._state_history = []
+        self._state_next_history = []
+        self._done_history = []
+        self._rewards_history = []
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
         self._model = keras.models.load_model(filename)
         self.create_target()
 
     def save(self, filename):
         self._model.save(filename)
 
-    def create(self):
+    def init_params(self):
         self._eps_end = self._exp_params['end']
         self._eps_decay = self._exp_params['decay']
         self.eps = self._exp_params['start']
@@ -173,6 +190,9 @@ class NaiveAgent(Agent):
         self._buffer_min_size = self._trn_params['batch_size']
         self._hidden_size = self._trn_params['hidden_size']  # TODO Hidden size of the DDDQN???
         self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
+        
+    def create(self):
+        self.init_params()
 
         self._frame_count = 0
 
@@ -187,21 +207,7 @@ class NaiveAgent(Agent):
 
         inputs = layers.Input(shape=(self._state_size,))
         layer1 = layers.Dense(128, activation="relu")(inputs)
-        layer2 = layers.Dense(128, activation="relu")(inputs)
         action = layers.Dense(self._action_size, activation="linear")(layer1)
-
-        # Network defined by the Deepmind paper
-        # inputs = layers.Input(shape=(84, 84, 4,))
-
-        # Convolutions on the frames on the screen
-        # layer1 = layers.Conv2D(32, 8, strides=4, activation="relu")(inputs)
-        # layer2 = layers.Conv2D(64, 4, strides=2, activation="relu")(layer1)
-        # layer3 = layers.Conv2D(64, 3, strides=1, activation="relu")(layer2)
-
-        # layer4 = layers.Flatten()(layer3)
-
-        # layer5 = layers.Dense(512, activation="relu")(layer4)
-        # action = layers.Dense(num_actions, activation="linear")(layer5)
 
         self._model = Model(inputs=inputs, outputs=action)
         self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
