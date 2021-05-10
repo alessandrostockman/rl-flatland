@@ -215,7 +215,6 @@ class DQNAgent(Agent):
         self._model = Model(inputs=inputs, outputs=action)
         self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
 
-        self._model.summary()
         self.create_target()
 
     def create_target(self):
