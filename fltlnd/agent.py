@@ -73,7 +73,7 @@ class RandomAgent(Agent):
     def __str__(self):
         return "random-agent"
 
-class SingleLayerAgent(Agent):
+class DQNAgent(Agent):
 
     def act(self, obs):
 
@@ -188,7 +188,7 @@ class SingleLayerAgent(Agent):
         self._tau = self._trn_params['tau']  # TODO Capire se serve
         self._gamma = self._trn_params['gamma']
         self._buffer_min_size = self._trn_params['batch_size']
-        self._hidden_size = self._trn_params['hidden_size']
+        self._hidden_sizes = self._trn_params['hidden_sizes']
         self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
         
     def create(self):
@@ -206,12 +206,16 @@ class SingleLayerAgent(Agent):
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         inputs = layers.Input(shape=(self._state_size,))
-        layer1 = layers.Dense(self._hidden_size, activation="relu")(inputs)
-        action = layers.Dense(self._action_size, activation="linear")(layer1)
+
+        layer = inputs
+        for hidden_size in self._hidden_sizes:
+            layer = layers.Dense(hidden_size, activation="relu")(layer)
+        action = layers.Dense(self._action_size, activation="linear")(layer)
 
         self._model = Model(inputs=inputs, outputs=action)
         self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
 
+        self._model.summary()
         self.create_target()
 
     def create_target(self):

@@ -1,11 +1,11 @@
 {
     "env": {
-        "n_agents": 1,
+        "n_agents": 5,
         "x_dim": 25,
         "y_dim": 25,
         "n_cities": 2,
         "max_rails_between_cities": 2,
-        "max_rails_in_city": 2,
+        "max_rails_in_city": 3,
         "seed": 42
     },
     "obs": {
@@ -26,11 +26,11 @@
         "tau": 1e-3,
         "gamma": 0.99,
         "buffer_min_size": 0,
-        "hidden_size": 128,
+        "hidden_sizes": [128],
         "use_gpu": true
     },
     "pol": {
-        "class": "SingleLayerAgent",
+        "class": "DQNAgent",
         "checkpoint_freq": 100,
         "base_dir": ""
     }
