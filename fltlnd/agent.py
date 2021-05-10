@@ -73,7 +73,6 @@ class RandomAgent(Agent):
     def __str__(self):
         return "random-agent"
 
-
 class SingleLayerAgent(Agent):
 
     def act(self, obs):

@@ -95,6 +95,7 @@ class ExcHandler:
                 for agent in range(self._env_params['n_agents']):
                     # Only update the values when we are done or when an action was taken and thus relevant information is present
                     if self._training and (update_values or done[agent]):
+                        #TODO: agent_obs instead of agent_next_obs??
                         self._policy.step(
                             agent_prev_obs[agent], agent_prev_action[agent], all_rewards[agent],
                             agent_obs[agent], done[agent]
