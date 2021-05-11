@@ -5,11 +5,11 @@ import json
 from fltlnd.handler import ExcHandler
 
 
-def main(episodes, parameters_filename, training, rendering, interactive, checkpoint):
+def main(episodes, parameters_filename, training, rendering, interactive, checkpoint, logging):
     with open(parameters_filename) as json_file:
         parameters = json.load(json_file)
 
-    ex = ExcHandler(parameters, training == 'T', rendering, interactive, checkpoint)
+    ex = ExcHandler(parameters, training == 'T', rendering, interactive, checkpoint, logging)
     ex.start(episodes)
 
 
@@ -25,10 +25,12 @@ if __name__ == "__main__":
     parser.add_argument('-I', '--interactive', dest="interactive", help="Executes in interactive mode", default=False,
                         action='store_true')
     parser.add_argument('-C', '--checkpoint', dest="checkpoint", help="Checkpoint file to be loaded", default=None)
+    parser.add_argument('-L', '--logging', dest="logging", help="Specify logging driver", default=None, 
+                        choices=[None, 'tensorboard'])
     args = parser.parse_args()
 
     start_time = time.time()
 
-    main(args.episodes, args.parameters, args.training, args.rendering, args.interactive, args.checkpoint)
+    main(args.episodes, args.parameters, args.training, args.rendering, args.interactive, args.checkpoint, args.logging)
 
     print("--- %s seconds ---" % (time.time() - start_time))

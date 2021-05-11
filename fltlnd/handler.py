@@ -15,7 +15,7 @@ import fltlnd.obs as obs_classes
 
 
 class ExcHandler:
-    def __init__(self, params, training=True, rendering=False, interactive=False, checkpoint=None):
+    def __init__(self, params, training=True, rendering=False, interactive=False, checkpoint=None, logging=None):
         self._env_params = params['env'] # Environment
         self._obs_params = params['obs'] # Observation
         self._exp_params = params['exp'] # Exploration
@@ -36,7 +36,7 @@ class ExcHandler:
 
         policy_class = getattr(agent_classes, self._pol_params['class'])
         self._policy = policy_class(self._state_size, self._action_size, self._exp_params, self._trn_params, 
-            self._pol_params, checkpoint=checkpoint, exploration=training)
+            self._pol_params, checkpoint=checkpoint, exploration=training, logging=logging)
 
         # variables to keep track of the progress
         self._scores_window = deque(maxlen=100)  # todo smooth when rendering instead

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import datetime
 import numpy as np
 
 from flatland.envs.rail_env import RailEnv
@@ -10,17 +11,19 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import Model
-
+from tensorflow.keras.callbacks import TensorBoard
 
 class Agent(ABC):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None, exploration=True):
+    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None, exploration=True, 
+            logging=None):
         self._state_size = state_size
         self._action_size = action_size
         self._exp_params = exp_params
         self._trn_params = trn_params
         self._pol_params = pol_params
         self._exploration = exploration
+        self._logging = logging
 
         if checkpoint is None:
             self.create()
@@ -90,9 +93,8 @@ class DQNAgent(Agent):
         # Decay probability of taking random action
         self.eps = max(self._eps_end, self._eps_decay * self.eps)
 
-
     def step(self, obs, action, reward, next_obs, done):
-        self._frame_count += 1
+        self._step_count += 1
 
         # Save actions and states in replay buffer
         self._action_history.append(action)
@@ -101,7 +103,7 @@ class DQNAgent(Agent):
         self._done_history.append(done)
         self._rewards_history.append(reward)
 
-        if self._frame_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
+        if self._step_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
             # Get indices of samples for replay buffers
             indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
 
@@ -141,12 +143,18 @@ class DQNAgent(Agent):
             grads = tape.gradient(loss, self._model.trainable_variables)
             self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
 
-        if self._frame_count % 10000 == 0:  # TODO update_target_network as parameter
+            if self._logging == 'tensorboard':
+                with self._writer.as_default():
+                    m_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+                    m_loss(loss)
+                    tf.summary.scalar('loss', m_loss.result(), step=(self._step_count // self._update_every))
+
+        if self._step_count % 10000 == 0:  # TODO update_target_network as parameter
             # update the the target network with new weights
             self._model_target.set_weights(self._model.get_weights())
             # Log details
             # template = "running reward: {:.2f} at episode {}, frame count {}"
-            # print(template.format(running_reward, episode_count, frame_count))
+            # print(template.format(running_reward, episode_count, step_count))
 
         # Limit the state and reward history
         if len(self._rewards_history) > self._memory_size:
@@ -159,7 +167,7 @@ class DQNAgent(Agent):
     def load(self, filename):
         self.init_params()
 
-        self._frame_count = 0
+        self._step_count = 0
 
         self._action_history = []
         self._state_history = []
@@ -190,11 +198,16 @@ class DQNAgent(Agent):
         self._buffer_min_size = self._trn_params['batch_size']
         self._hidden_sizes = self._trn_params['hidden_sizes']
         self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
+
+        if self._logging == 'tensorboard':
+            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            log_dir = 'logs/' + current_time
+            self._writer = tf.summary.create_file_writer(log_dir)
         
     def create(self):
         self.init_params()
 
-        self._frame_count = 0
+        self._step_count = 0
 
         self._action_history = []
         self._state_history = []
@@ -225,4 +238,4 @@ class DQNAgent(Agent):
         self._model_target.set_weights(self._model.get_weights())
 
     def __str__(self):
-        return "naive-agent"
+        return "dqn-agent-" + '-'.join(str(x) for x in self._hidden_sizes)
