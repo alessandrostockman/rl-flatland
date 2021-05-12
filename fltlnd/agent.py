@@ -239,3 +239,55 @@ class DQNAgent(Agent):
 
     def __str__(self):
         return "dqn-agent-" + '-'.join(str(x) for x in self._hidden_sizes)
+
+
+class DDDQNAgent(Agent):
+
+    def act(self, obs):
+        pass
+
+    def step(self, obs, action, reward, next_obs, done):
+        pass
+
+    def save(self, filename):
+        pass
+
+    def load(self, filename):
+        pass
+
+    def __str__(self):
+        return "dddqn-agent"
+
+class PPOAgent(Agent):
+
+    def act(self, obs):
+        pass
+
+    def step(self, obs, action, reward, next_obs, done):
+        pass
+
+    def save(self, filename):
+        pass
+
+    def load(self, filename):
+        pass
+
+    def __str__(self):
+        return "ppo-agent"
+
+class LSTMAgent(Agent):
+
+    def act(self, obs):
+        pass
+
+    def step(self, obs, action, reward, next_obs, done):
+        pass
+
+    def save(self, filename):
+        pass
+
+    def load(self, filename):
+        pass
+
+    def __str__(self):
+        return "lstm-agent"
