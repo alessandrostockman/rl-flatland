@@ -197,6 +197,3 @@ class EnvHandler:
         if self._rendering:
             self._renderer.reset()
         return obs, info
-
-        import numpy as np
-
