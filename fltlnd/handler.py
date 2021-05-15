@@ -64,6 +64,8 @@ class ExcHandler:
             agent_obs = [None] * self._env_params['n_agents']
             agent_prev_obs = [None] * self._env_params['n_agents']
             agent_prev_action = [2] * self._env_params['n_agents']
+            agent_prev_rewards = [0] * self._env_params['n_agents']
+            agent_prev_done = [0] * self._env_params['n_agents']
 
             # Reset environment
             obs, info = self._env_handler.reset()
@@ -94,15 +96,18 @@ class ExcHandler:
                 # Update replay buffer and train agent
                 for agent in range(self._env_params['n_agents']):
                     # Only update the values when we are done or when an action was taken and thus relevant information is present
+                    #TODO: done[agent] or done['__all__']?
                     if self._training and (update_values or done[agent]):
                         #TODO: agent_obs instead of agent_next_obs??
                         self._policy.step(
-                            agent_prev_obs[agent], agent_prev_action[agent], all_rewards[agent],
-                            agent_obs[agent], done[agent]
+                            agent_prev_obs[agent], agent_prev_action[agent], agent_prev_rewards[agent],
+                            agent_obs[agent], agent_prev_done[agent]
                         )
 
                         agent_prev_obs[agent] = agent_obs[agent].copy()
                         agent_prev_action[agent] = action_dict[agent]
+                        agent_prev_rewards[agent] = all_rewards[agent]
+                        agent_prev_done[agent] = done[agent]
 
                     if next_obs[agent]:
                         agent_obs[agent] = self._obs_wrapper.normalize(next_obs[agent])
