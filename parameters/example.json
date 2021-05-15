@@ -1,12 +1,12 @@
 {
     "env": {
-        "n_agents": 5,
+        "n_agents": 3,
         "x_dim": 25,
         "y_dim": 25,
         "n_cities": 2,
         "max_rails_between_cities": 2,
         "max_rails_in_city": 3,
-        "seed": 42
+        "seed": 29
     },
     "obs": {
         "class": "TreeObs",
@@ -30,7 +30,7 @@
         "use_gpu": true
     },
     "pol": {
-        "class": "DQNAgent",
+        "class": "DDDQNAgent",
         "checkpoint_freq": 100,
         "base_dir": ""
     }

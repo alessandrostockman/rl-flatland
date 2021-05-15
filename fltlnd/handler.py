@@ -16,11 +16,11 @@ import fltlnd.obs as obs_classes
 
 class ExcHandler:
     def __init__(self, params, training=True, rendering=False, interactive=False, checkpoint=None, logging=None):
-        self._env_params = params['env'] # Environment
-        self._obs_params = params['obs'] # Observation
-        self._exp_params = params['exp'] # Exploration
-        self._trn_params = params['trn'] # Training
-        self._pol_params = params['pol'] # Policy
+        self._env_params = params['env']  # Environment
+        self._obs_params = params['obs']  # Observation
+        self._exp_params = params['exp']  # Exploration
+        self._trn_params = params['trn']  # Training
+        self._pol_params = params['pol']  # Policy
 
         self._training = training
         self._interactive = interactive
@@ -34,6 +34,7 @@ class ExcHandler:
         self._action_size = 5
         self._state_size = self._obs_wrapper.get_state_size()
 
+        # create agent Agent per policy
         policy_class = getattr(agent_classes, self._pol_params['class'])
         self._policy = policy_class(self._state_size, self._action_size, self._exp_params, self._trn_params, 
             self._pol_params, checkpoint=checkpoint, exploration=training, logging=logging)
@@ -126,7 +127,8 @@ class ExcHandler:
                 action_count = [1] * self._action_size
 
                 if self._training:
-                    self._policy.save(self._pol_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
+                    self._policy.save(self._pol_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(
+                        episode_idx) + '.pth/')
             else:
                 end = " "
 
@@ -197,6 +199,4 @@ class EnvHandler:
         if self._rendering:
             self._renderer.reset()
         return obs, info
-
-        import numpy as np
 
