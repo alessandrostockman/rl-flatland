@@ -277,14 +277,40 @@ class PPOAgent(Agent):
 
 class LSTMAgent(Agent):
 
+    #TODO: Organize input_shape
+    def lstm_model(self,input_shape):
+        self.model = keras.Sequential()
+
+        #2 LSTM layers
+        #5 perchè le mosse che posso eseguire sono 5: destra, sinistra, avanti, indietro, fermo
+        self.model.add(keras.layers.LSTM(5, input_shape = input_shape, return_sequences= True))
+        self.model.add(keras.layers.LSTM(5))
+
+        #dense layer
+        self.model.add(keras.layers.Dense(5, activation='relu'))
+
+        #mitigate overfitting
+        self.model.add(keras.layers.Dropout(0.3))
+
+        #output layer
+        self.model.add(keras.layers.Dense(5, activation='softmax'))
+
+
     def act(self, obs):
-        pass
+        if self.eps > np.random.rand(1)[0] and self._exploration:
+            action = np.random.choice(self._action_size)
+        else:
+            state_tensor = tf.convert_to_tensor(obs)
+            state_tensor = tf.expand_dims(state_tensor, 0)
+            action_probs = self._model(state_tensor, training=False)
+            action = tf.argmax(action_probs[0]).numpy()
+        return action
 
     def step(self, obs, action, reward, next_obs, done):
         pass
 
     def save(self, filename):
-        pass
+        self._model.save(filename)
 
     def load(self, filename):
         pass
