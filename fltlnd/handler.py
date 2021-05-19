@@ -10,8 +10,10 @@ from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 from flatland.utils.rendertools import RenderTool
 
+from fltlnd.deadlocks import DeadlocksDetector
 import fltlnd.agent as agent_classes
 import fltlnd.obs as obs_classes
+
 
 
 class ExcHandler:
@@ -170,6 +172,7 @@ class EnvHandler:
             number_of_agents=self._params['n_agents'],
             obs_builder_object=obs_builder
         )
+        self.deadlocks_detector = DeadlocksDetector()
 
         self._renderer = RenderTool(self.env)
 
@@ -190,14 +193,29 @@ class EnvHandler:
         # TODO: If interactive mode wait for input
         next_obs, all_rewards, done, info = self.env.step(action_dict)
 
+        # Compute deadlocks
+        deadlocks = self.deadlocks_detector.step(self.env)
+        info["deadlocks"] = {}
+        for agent in range(self.env.get_num_agents()):
+            info["deadlocks"][agent] = deadlocks[agent]
+
         if self._rendering:
             self._renderer.render_env(show=True, show_observations=True, show_predictions=False)
 
         return next_obs, all_rewards, done, info
 
+    def get_num_agents(self):
+        return self.env.number_of_agents
+
     def reset(self):
         obs, info = self.env.reset(True, True)
         # TODO: Oppure env.reset(regenerate_rail=True, regenerate_schedule=True)
+
+        self.deadlocks_detector.reset(self.env.get_num_agents())
+        info["deadlocks"] = {}
+
+        for agent in range(self.env.get_num_agents()):
+            info["deadlocks"][agent] = self.deadlocks_detector.deadlocks[agent]
 
         if self._rendering:
             self._renderer.reset()
