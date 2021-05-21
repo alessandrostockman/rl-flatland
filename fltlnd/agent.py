@@ -1,17 +1,10 @@
 from abc import ABC, abstractmethod
-import datetime
 import numpy as np
-
-from flatland.envs.rail_env import RailEnv
-from flatland.envs.rail_generators import sparse_rail_generator
-from flatland.envs.schedule_generators import sparse_schedule_generator
-from flatland.envs.observations import TreeObsForRailEnv
 
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import Model
-from tensorflow.keras.callbacks import TensorBoard
 
 class Agent(ABC):
 
