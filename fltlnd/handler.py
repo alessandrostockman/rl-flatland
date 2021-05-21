@@ -1,5 +1,6 @@
 import json
 import random
+from flatland.envs import malfunction_generators as mal_gen
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -176,20 +177,50 @@ class EnvHandler:
 
     def update(self, env="r1.s", seed=None):
         self._params = self._full_env_params[env]
-        self.env = RailEnv(
-            width=self._params['x_dim'],
-            height=self._params['y_dim'],
-            rail_generator=sparse_rail_generator(
-                max_num_cities=self._params['n_cities'],
-                seed=seed,
-                grid_mode=True,
-                max_rails_between_cities=self._params['max_rails_between_cities'],
-                max_rails_in_city=self._params['max_rails_in_city']
-            ),
-            schedule_generator=sparse_schedule_generator(),
-            number_of_agents=self._params['n_agents'],
-            obs_builder_object=self._obs_builder
-        )
+
+        self.x_dim = self._params['x_dim']
+        self.y_dim = self._params['y_dim']
+        self.n_cities = self._params['n_cities']
+        self.grid_mode = self._params['grid_mode']
+        self.max_rails_between_cities = self._params['max_rails_between_cities']
+        self.max_rails_in_city = self._params['max_rails_in_city']
+        self.n_agents = self._params['n_agents']
+        min_mal, max_mal = self._params['malfunction_duration']
+        self.mal_params = mal_gen.MalfunctionParameters(1 / self._params['min_malfunction_interval'], min_mal, max_mal)
+
+        # Check for ParamMalfunctionGen existance for retrocompatibility purposes
+        try:
+            self.env = RailEnv(
+                width=self.x_dim,
+                height=self.y_dim,
+                rail_generator=sparse_rail_generator(
+                    max_num_cities=self.n_cities,
+                    seed=seed,
+                    grid_mode=self.grid_mode,
+                    max_rails_between_cities=self.max_rails_between_cities,
+                    max_rails_in_city=self.max_rails_in_city
+                ),
+                schedule_generator=sparse_schedule_generator(),
+                number_of_agents=self.n_agents,
+                obs_builder_object=self._obs_builder,
+                malfunction_generator=mal_gen.ParamMalfunctionGen(self.mal_params),
+            )
+        except NameError:
+            self.env = RailEnv(
+                width=self.x_dim,
+                height=self.y_dim,
+                rail_generator=sparse_rail_generator(
+                    max_num_cities=self.n_cities,
+                    seed=seed,
+                    grid_mode=self.grid_mode,
+                    max_rails_between_cities=self.max_rails_between_cities,
+                    max_rails_in_city=self.max_rails_in_city
+                ),
+                schedule_generator=sparse_schedule_generator(),
+                number_of_agents=self.n_agents,
+                obs_builder_object=self._obs_builder,
+                malfunction_generator_and_process_data=mal_gen.malfunction_from_params(self.mal_params)
+            )
 
         if self._rendering:
             self._renderer = RenderTool(self.env)
@@ -222,7 +253,7 @@ class EnvHandler:
         return next_obs, all_rewards, done, info
 
     def get_num_agents(self):
-        return self.env.get_num_agents()
+        return self.n_agents
 
     def get_agents_handle(self):
         return self.env.get_agent_handles()

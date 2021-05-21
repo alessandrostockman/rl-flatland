@@ -1,4 +1,15 @@
 {
+    "r0.s": {
+        "n_agents": 1,
+        "x_dim": 25,
+        "y_dim": 25,
+        "n_cities": 2,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "min_malfunction_interval": 50,
+        "grid_mode": false,
+        "malfunction_duration": [20, 50]
+    },
     "r1.s": {
         "n_agents": 5,
         "x_dim": 25,

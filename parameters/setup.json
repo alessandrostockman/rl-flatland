@@ -23,13 +23,13 @@
         "exp_end": 0.01,
         "exp_decay": 0.997,
         "checkpoint_freq": 100,
-        "env": "r1.s"
+        "env": "r0.s"
     },
     "log": {
         "log_dir": "logs",
         "hp_dir": "hparam_tuning",
         "attributes": ["completions", "scores", "steps", "act_0", "act_1", "act_2", "act_3", "act_4"],
         "hp_params_filename": "parameters/hp.json",
-        "hp_tuning": true
+        "hp_tuning": false
     }
 }
