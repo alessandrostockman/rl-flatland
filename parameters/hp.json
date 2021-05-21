@@ -1,0 +1,14 @@
+{
+    "buffer_size": {
+        "type": "discrete",
+        "values": [50000, 100000, 500000, 1000000]
+    },
+    "batch_size": {
+        "type": "discrete",
+        "values": [16, 32, 64, 128]
+    },
+    "learning_rate": {
+        "type": "discrete",
+        "values": [0.5e-4, 0.5e-3]
+    }
+}

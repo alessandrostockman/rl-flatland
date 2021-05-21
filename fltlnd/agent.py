@@ -15,15 +15,11 @@ from tensorflow.keras.callbacks import TensorBoard
 
 class Agent(ABC):
 
-    def __init__(self, state_size, action_size, exp_params, trn_params, pol_params, checkpoint=None, exploration=True, 
-            logging=None):
+    def __init__(self, state_size, action_size, params, checkpoint=None, exploration=True):
         self._state_size = state_size
         self._action_size = action_size
-        self._exp_params = exp_params
-        self._trn_params = trn_params
-        self._pol_params = pol_params
+        self._params = params
         self._exploration = exploration
-        self._logging = logging
 
         if checkpoint is None:
             self.create()
@@ -143,18 +139,10 @@ class DQNAgent(Agent):
             grads = tape.gradient(loss, self._model.trainable_variables)
             self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
 
-            if self._logging == 'tensorboard':
-                with self._writer.as_default():
-                    m_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
-                    m_loss(loss)
-                    tf.summary.scalar('loss', m_loss.result(), step=(self._step_count // self._update_every))
-
         if self._step_count % 10000 == 0:  # TODO update_target_network as parameter
             # update the the target network with new weights
             self._model_target.set_weights(self._model.get_weights())
-            # Log details
-            # template = "running reward: {:.2f} at episode {}, frame count {}"
-            # print(template.format(running_reward, episode_count, step_count))
+            #self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights())))
 
         # Limit the state and reward history
         if len(self._rewards_history) > self._memory_size:
@@ -185,24 +173,18 @@ class DQNAgent(Agent):
         self._model.save(filename)
 
     def init_params(self):
-        self._eps_end = self._exp_params['end']
-        self._eps_decay = self._exp_params['decay']
-        self.eps = self._exp_params['start']
+        self.eps = self._params['exp_start']
 
-        self._memory_size = self._trn_params['memory_size']
-        self._batch_size = self._trn_params['batch_size']
-        self._update_every = self._trn_params['update_every']
-        self._learning_rate = self._trn_params['learning_rate']
-        self._tau = self._trn_params['tau']  # TODO Capire se serve
-        self._gamma = self._trn_params['gamma']
-        self._buffer_min_size = self._trn_params['batch_size']
-        self._hidden_sizes = self._trn_params['hidden_sizes']
-        self._use_gpu = self._trn_params['use_gpu']  # TODO: always true
-
-        if self._logging == 'tensorboard':
-            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            log_dir = 'logs/' + current_time
-            self._writer = tf.summary.create_file_writer(log_dir)
+        self._eps_end = self._params['exp_end']
+        self._eps_decay = self._params['exp_decay']
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every']
+        self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
+        self._gamma = self._params['gamma']
+        self._buffer_min_size = self._params['batch_size']
+        self._hidden_sizes = self._params['hidden_sizes']
         
     def create(self):
         self.init_params()

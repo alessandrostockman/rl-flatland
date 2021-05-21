@@ -1,0 +1,35 @@
+{
+    "sys": {
+        "seed": 42,
+        "base_dir": "",
+        "obs_class": "TreeObs",
+        "agent_class": "DQNAgent",
+        "log_class": "TensorboardLogger"
+    },
+    "obs": {
+        "tree_depth": 2,
+        "radius": 10
+    },
+    "trn": {
+        "memory_size": 100000,
+        "batch_size": 32,
+        "update_every": 8,
+        "learning_rate": 0.5e-4,
+        "tau": 1e-3,
+        "gamma": 0.99,
+        "buffer_min_size": 0,
+        "hidden_sizes": [128],
+        "exp_start": 1.0,
+        "exp_end": 0.01,
+        "exp_decay": 0.997,
+        "checkpoint_freq": 100,
+        "env": "r1.s"
+    },
+    "log": {
+        "log_dir": "logs",
+        "hp_dir": "hparam_tuning",
+        "attributes": ["completions", "scores", "steps", "act_0", "act_1", "act_2", "act_3", "act_4"],
+        "hp_params_filename": "parameters/hp.json",
+        "hp_tuning": true
+    }
+}
