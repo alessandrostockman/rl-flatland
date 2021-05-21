@@ -141,7 +141,7 @@ class DQNAgent(Agent):
 
         if self._step_count % 10000 == 0:  # TODO update_target_network as parameter
             # update the the target network with new weights
-            self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights())))
+            self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights()))
 
         # Limit the state and reward history
         if len(self._rewards_history) > self._memory_size:
