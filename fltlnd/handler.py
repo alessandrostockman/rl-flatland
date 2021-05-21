@@ -205,7 +205,7 @@ class EnvHandler:
                 obs_builder_object=self._obs_builder,
                 malfunction_generator=mal_gen.ParamMalfunctionGen(self.mal_params),
             )
-        except NameError:
+        except AttributeError:
             self.env = RailEnv(
                 width=self.x_dim,
                 height=self.y_dim,
