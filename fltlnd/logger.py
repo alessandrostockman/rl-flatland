@@ -54,10 +54,9 @@ class TensorboardLogger(Logger):
     def episode_start(self):
         self._run_dir = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        if self._hp_tuning:
-            self._windows = {}
-            for attr in self._attributes:
-                self._windows[attr] = deque(maxlen=100)
+        self._windows = {}
+        for attr in self._attributes:
+            self._windows[attr] = deque(maxlen=100)
 
     def episode_end(self, params, scores, episode_idx):
         if self._hp_tuning:
