@@ -29,7 +29,6 @@
         "log_dir": "logs",
         "hp_dir": "hparam_tuning",
         "attributes": ["completions", "scores", "steps", "act_0", "act_1", "act_2", "act_3", "act_4"],
-        "hp_params_filename": "parameters/hp.json",
-        "hp_tuning": false
+        "hp_params_filename": "parameters/hp.json"
     }
 }

@@ -1,11 +1,13 @@
+from typing import Optional
+from fltlnd.utils import TrainingMode
 import json
+import time
 import random
 from flatland.envs import malfunction_generators as mal_gen
 import matplotlib.pyplot as plt
 import numpy as np
 
 from collections import deque
-from pathlib import Path
 
 from flatland.envs.rail_env import RailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
@@ -17,17 +19,17 @@ import fltlnd.agent as agent_classes
 import fltlnd.obs as obs_classes
 import fltlnd.logger as logger_classes
 
-
-
 class ExcHandler:
-    def __init__(self, params, training=True, rendering=False, checkpoint=None):
+    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str]):
         self._sys_params = params['sys'] # System
         self._obs_params = params['obs'] # Observation
         self._trn_params = params['trn'] # Training
         self._log_params = params['log'] # Policy
 
-        self._training = training
         self._rendering = rendering
+        self._training = training_mode is not TrainingMode.OFF
+        self._tuning = training_mode is TrainingMode.TUNING
+        self._train_best = training_mode is TrainingMode.BEST
 
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
@@ -40,7 +42,7 @@ class ExcHandler:
         self._action_size = 5
         self._state_size = self._obs_wrapper.get_state_size()
 
-        self._logger = self._logger_class(self._log_params)
+        self._logger = self._logger_class(self._log_params, self._tuning)
 
         # variables to keep track of the progress
         self._scores_window = deque(maxlen=100)  # todo smooth when rendering instead
@@ -49,13 +51,15 @@ class ExcHandler:
         self._completion = []
 
     def start(self, n_episodes):
+        start_time = time.time()
         random.seed(self._sys_params['seed'])
         np.random.seed(self._sys_params['seed'])
 
         for params in self._logger.get_run_params():
             self._logger.episode_start()
             self._trn_params.update(params)
-            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params)
+            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, self._training, 
+                self._train_best, self._sys_params['base_dir'])
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
             # Max number of steps per episode
@@ -150,7 +154,8 @@ class ExcHandler:
                     action_count = [1] * self._action_size
 
                     if self._training:
-                        self._policy.save(self._sys_params['base_dir'] + 'checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
+                        self._policy.save('./tmp/checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
+                        self._policy.save_best()
                 else:
                     end = " "
 
@@ -165,6 +170,7 @@ class ExcHandler:
             plt.plot(self._completion)
             plt.title("Completions")
             plt.show()
+            return time.time() - start_time
 
 class EnvHandler:
     def __init__(self, obs_builder, rendering=False):

@@ -11,10 +11,10 @@ from tensorboard.plugins.hparams import api as hp
 
 class Logger(ABC):
 
-    def __init__(self, parameters):
+    def __init__(self, parameters, tuning=False):
         self._attributes = parameters['attributes']
         self._log_dir = parameters['log_dir']
-        self._hp_tuning = parameters['hp_tuning']
+        self._hp_tuning = tuning
 
         if self._hp_tuning:
             self._hp_dir = parameters['hp_dir']

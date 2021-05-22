@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import os
 import numpy as np
 
 import tensorflow as tf
@@ -8,16 +9,17 @@ from tensorflow.keras import Model
 
 class Agent(ABC):
 
-    def __init__(self, state_size, action_size, params, checkpoint=None, exploration=True):
+    def __init__(self, state_size, action_size, params, exploration=True, train_best=True, base_dir=""):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
         self._exploration = exploration
+        self._base_dir = base_dir
 
-        if checkpoint is None:
-            self.create()
+        if train_best:
+            self.load_best()
         else:
-            self.load(checkpoint)
+            self.create()
 
     @abstractmethod
     def create(self):
@@ -36,12 +38,23 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def save(self, filename):
+    def save(self, filename, overwrite=False):
         pass
 
     @abstractmethod
     def load(self, filename):
         pass
+
+    def load_best(self):
+        filename = self._base_dir + 'checkpoints/' + str(self)
+
+        if os.path.exists(filename):
+            self.load(filename)
+        else:
+            self.create()
+
+    def save_best(self):
+        self.save(self._base_dir + 'checkpoints/' + str(self), overwrite=True)
 
     @abstractmethod
     def __str__(self):
@@ -56,7 +69,7 @@ class RandomAgent(Agent):
     def step(self, obs, action, reward, next_obs, done):
         pass
 
-    def save(self, filename):
+    def save(self, filename, overwrite=False):
         pass
 
     def load(self, filename):
@@ -161,8 +174,8 @@ class DQNAgent(Agent):
         self._model = keras.models.load_model(filename)
         self.create_target()
 
-    def save(self, filename):
-        self._model.save(filename)
+    def save(self, filename, overwrite=False):
+        self._model.save(filename, overwrite=overwrite)
 
     def init_params(self):
         self.eps = self._params['exp_start']
@@ -212,7 +225,7 @@ class DQNAgent(Agent):
         self._model_target.set_weights(self._model.get_weights())
 
     def __str__(self):
-        return "dqn-agent-" + '-'.join(str(x) for x in self._hidden_sizes)
+        return "dqn-agent"
 
 
 class DDDQNAgent(Agent):
