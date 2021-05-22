@@ -259,8 +259,7 @@ class EnvHandler:
         return self.env.get_agent_handles()
 
     def reset(self):
-        obs, info = self.env.reset(True, True)
-        # TODO: Oppure env.reset(regenerate_rail=True, regenerate_schedule=True)
+        obs, info = self.env.reset(regenerate_rail=True, regenerate_schedule=True)
 
         self.deadlocks_detector.reset(self.env.get_num_agents())
         info["deadlocks"] = {}
