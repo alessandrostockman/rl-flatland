@@ -29,7 +29,8 @@
     "log": {
         "log_dir": "logs",
         "hp_dir": "hparam_tuning",
-        "attributes": ["completions", "scores", "steps", "act_0", "act_1", "act_2", "act_3", "act_4"],
+        "attributes": ["completions", "scores", "steps", "loss", "deadlocks", "exploration_prob", "min_steps", 
+            "exploration_count", "act_0", "act_1", "act_2", "act_3", "act_4"],
         "hp_params_filename": "parameters/hp.json"
     }
 }

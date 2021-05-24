@@ -44,12 +44,6 @@ class ExcHandler:
 
         self._logger = self._logger_class(self._log_params, self._tuning)
 
-        # variables to keep track of the progress
-        self._scores_window = deque(maxlen=100)  # todo smooth when rendering instead
-        self._completion_window = deque(maxlen=100)
-        self._scores = []
-        self._completion = []
-
     def start(self, n_episodes):
         start_time = time.time()
         random.seed(self._sys_params['seed'])
@@ -68,6 +62,7 @@ class ExcHandler:
 
             for episode_idx in range(n_episodes):
                 score = 0
+                deadlocks = 0
                 action_dict = dict()
                 action_count = [0] * self._action_size
                 agent_obs = [None] * self._env_handler.get_num_agents()
@@ -122,26 +117,24 @@ class ExcHandler:
                             agent_obs[agent] = self._obs_wrapper.normalize(next_obs[agent])
 
                         score += all_rewards[agent]
+                    
+                    deadlocks += sum(info['deadlocks'].values())
 
                     if done['__all__']:
                         break
 
-                # Collection information about training TODO: Remove
+                # Collection information about training
                 tasks_finished = np.sum([int(done[idx]) for idx in self._env_handler.get_agents_handle()])
-                self._completion_window.append(tasks_finished / max(1, self._env_handler.env.get_num_agents()))
-                self._scores_window.append(score / (self._max_steps * self._env_handler.env.get_num_agents()))
-                self._completion.append((np.mean(self._completion_window)))
-                self._scores.append(np.mean(self._scores_window))
                 action_probs = action_count / np.sum(action_count)
 
                 self._logger.log_episode({**{
                     "completions": tasks_finished / max(1, self._env_handler.env.get_num_agents()),
                     "scores": score / (self._max_steps * self._env_handler.env.get_num_agents()),
                     "steps": count_steps / self._max_steps,
-                    # "loss": self._policy.loss
-                    # "deadlocks": d / self._env_handler.env.get_num_agents(),
-                    # "exploration_prob": self._policy.eps,
-                    # "exploration_count": self._policy.eps_counter,
+                    "loss": self._policy.stats['loss'],
+                    "deadlocks": deadlocks / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
+                    "exploration_prob": self._policy.stats['eps_val'],
+                    "exploration_count": self._policy.stats['eps_counter'],
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
@@ -159,17 +152,9 @@ class ExcHandler:
                 else:
                     end = " "
 
-                self._env_handler.print_results(episode_idx, self._scores_window, self._completion_window,
-                                                action_probs, end)
+                self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
+                    self._logger.get_window('completions'), action_probs, end)
 
-            # Plot overall training progress at the end TODO: Remove
-            plt.plot(self._scores)
-            plt.title("Scores")
-            plt.show()
-
-            plt.plot(self._completion)
-            plt.title("Completions")
-            plt.show()
             return time.time() - start_time
 
 class EnvHandler:

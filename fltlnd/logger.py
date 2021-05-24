@@ -76,6 +76,9 @@ class TensorboardLogger(Logger):
     def log_episode(self, pack, idx):
         self._log(pack, "epsd", idx)
 
+    def get_window(self, key):
+        return self._windows[key]
+
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
             self._windows[attr].append(val)
