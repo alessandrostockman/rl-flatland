@@ -185,6 +185,7 @@ class DQNAgent(Agent):
         self._rewards_history = []
 
         self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         self._model = keras.models.load_model(filename)
 
