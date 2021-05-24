@@ -11,8 +11,9 @@ from tensorboard.plugins.hparams import api as hp
 
 class Logger(ABC):
 
-    def __init__(self, parameters, tuning=False):
+    def __init__(self, base_dir, parameters, tuning=False):
         self._attributes = parameters['attributes']
+        self._base_dir= base_dir
         self._log_dir = parameters['log_dir']
         self._hp_tuning = tuning
 
@@ -76,6 +77,9 @@ class TensorboardLogger(Logger):
     def log_episode(self, pack, idx):
         self._log(pack, "epsd", idx)
 
+    def get_window(self, key):
+        return self._windows[key]
+
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
             self._windows[attr].append(val)
@@ -102,7 +106,7 @@ class TensorboardLogger(Logger):
         self._hparams = []
         self._parameter_list = {}
         self._combinations = []
-        with open(self._hp_params_filename) as json_file:
+        with open(self._base_dir + self._hp_params_filename) as json_file:
             hyper_params = json.load(json_file)
             for key, descr in hyper_params.items():
                 if descr['type'] == 'discrete':

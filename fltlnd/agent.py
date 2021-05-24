@@ -67,7 +67,7 @@ class Agent(ABC):
             self.create()
 
     def save_best(self):
-        self.save(self._base_dir + 'checkpoints/' + str(self), overwrite=True)
+        self.save(self._base_dir + 'checkpoints/' + str(self))
 
     @abstractmethod
     def __str__(self):
@@ -96,8 +96,9 @@ class DQNAgent(Agent):
 
     def act(self, obs):
 
-        if self.eps > np.random.rand(1)[0] and self._exploration:
+        if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration:
             action = np.random.choice(self._action_size)
+            self.stats['eps_counter'] += 1
         else:
             state_tensor = tf.convert_to_tensor(obs)
             state_tensor = tf.expand_dims(state_tensor, 0)
@@ -107,7 +108,7 @@ class DQNAgent(Agent):
 
     def episode_end(self):
         # Decay probability of taking random action
-        self.eps = max(self._eps_end, self._eps_decay * self.eps)
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
 
     def step(self, obs, action, reward, next_obs, done):
         self._step_count += 1
@@ -147,6 +148,7 @@ class DQNAgent(Agent):
             q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
             # Calculate loss between new Q-value and old Q-value
             loss = self._loss(updated_q_values, q_action)
+            self.stats['loss'] = loss
 
         # Backpropagation
         grads = tape.gradient(loss, self._model.trainable_variables)
@@ -162,11 +164,15 @@ class DQNAgent(Agent):
 
         self._model = keras.models.load_model(filename)
 
-    def save(self, filename, overwrite=False):
+    def save(self, filename, overwrite=True):
         self._model.save(filename, overwrite=overwrite)
 
     def init_params(self):
-        self.eps = self._params['exp_start']
+        self.stats = {
+            "eps_val": self._params['exp_start'],
+            "eps_counter": 0,
+            "loss": None
+        }
 
         self._eps_end = self._params['exp_end']
         self._eps_decay = self._params['exp_decay']
