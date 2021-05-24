@@ -4,24 +4,21 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.layers import Input, Dense, Lambda, Add
-from tensorflow.keras import backend as K
-from tensorflow.keras.optimizers import Adam
-
+import pickle
 
 # added for DDDQN
 from tensorflow.keras import layers
 from glob import glob
-from random import sample  # used to get random minibacth
+
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Add
 from tensorflow.keras import backend as K
+
+from fltlnd.replay_buffer import ReplayBuffer
 from tensorflow.keras.optimizers import Adam
-from collections import deque  # needed for replay memory
 from tensorflow.python.framework.ops import disable_eager_execution
-#disable_eager_execution()  # Disable Eager, IMPORTANT!
+
+# disable_eager_execution()  # Disable Eager, IMPORTANT!
 
 class Agent(ABC):
 
@@ -116,36 +113,18 @@ class DQNAgent(Agent):
     def step(self, obs, action, reward, next_obs, done):
         self._step_count += 1
 
-        # Save actions and states in replay buffer
-        self._action_history.append(action)
-        self._state_history.append(obs)
-        self._state_next_history.append(next_obs)
-        self._done_history.append(done)
-        self._rewards_history.append(reward)
+        #Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
 
-        if self._step_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
+        # If enough samples are available in memory, get random subset and learn
+        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
+                self._memory) > self._batch_size:
             self.train()
 
-        # Limit the state and reward history
-        if len(self._rewards_history) > self._memory_size:
-            del self._rewards_history[:1]
-            del self._state_history[:1]
-            del self._state_next_history[:1]
-            del self._action_history[:1]
-            del self._done_history[:1]
-
     def train(self):
-        # Get indices of samples for replay buffers
-        indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
 
-        # Using list comprehension to sample from replay buffer
-        state_sample = np.array([self._state_history[i] for i in indices])
-        state_next_sample = np.array([self._state_next_history[i] for i in indices])
-        rewards_sample = [self._rewards_history[i] for i in indices]
-        action_sample = [self._action_history[i] for i in indices]
-        done_sample = tf.convert_to_tensor(
-            [float(self._done_history[i]) for i in indices]
-        )
+        # Get samples from replay buffer
+        state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
 
         # Build the updated Q-values for the sampled future states
         # Use the target model for stability
@@ -174,17 +153,11 @@ class DQNAgent(Agent):
         # Backpropagation
         grads = tape.gradient(loss, self._model.trainable_variables)
         self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
-        
+
     def load(self, filename):
         self.init_params()
 
         self._step_count = 0
-
-        self._action_history = []
-        self._state_history = []
-        self._state_next_history = []
-        self._done_history = []
-        self._rewards_history = []
 
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
@@ -211,17 +184,14 @@ class DQNAgent(Agent):
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
+        self._buffer_size = 32000
+
+        self._memory = ReplayBuffer(self._buffer_size, self._batch_size)
 
     def create(self):
         self.init_params()
 
         self._step_count = 0
-
-        self._action_history = []
-        self._state_history = []
-        self._state_next_history = []
-        self._done_history = []
-        self._rewards_history = []
 
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
@@ -245,19 +215,20 @@ class DQNAgent(Agent):
     def __str__(self):
         return "dqn-agent"
 
+
 class DoubleDQNAgent(DQNAgent):
 
     def load(self, filename):
         super().load(filename)
         self.create_target()
-    
+
     def create(self):
         super().create()
         self.create_target()
-    
+
     def init_params(self):
         super().init_params()
-        
+
         self._target_update = self._params['target_update']
 
     def create_target(self):
@@ -280,6 +251,7 @@ class DoubleDQNAgent(DQNAgent):
 
     def __str__(self):
         return "double-dqn-agent"
+
 
 class DuelingDQNAgent(DQNAgent):
 
@@ -304,9 +276,9 @@ class DuelingDQNAgent(DQNAgent):
         Q_model.compile(loss='mse', optimizer=self._optimizer)
         return Q_model
 
-
     def __str__(self):
         return "dueling-dqn-agent"
+
 
 class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
 
