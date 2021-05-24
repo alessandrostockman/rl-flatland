@@ -269,7 +269,11 @@ class DoubleDQNAgent(DQNAgent):
         super().step(obs, action, reward, next_obs, done)
         if self._step_count % self._target_update == 0:
             # update the the target network with new weights
-            self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights()))
+            weights = self._model.get_weights()
+            target_weights = self._model_target.get_weights()
+            for i in range(len(weights)):
+                target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
+            self._model_target.set_weights(target_weights)
 
     def _get_future_rewards(self, state_next_sample):
         return self._model_target.predict(state_next_sample)
