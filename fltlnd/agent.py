@@ -5,7 +5,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras import Model
+from tensorflow.keras.models import Model, load_model
+from tensorflow.keras.layers import Input, Dense, Lambda, Add
+from tensorflow.keras import backend as K
+from tensorflow.keras.optimizers import Adam
 
 class Agent(ABC):
 
@@ -131,7 +134,7 @@ class DQNAgent(Agent):
 
         # Build the updated Q-values for the sampled future states
         # Use the target model for stability
-        future_rewards = self._model_target.predict(state_next_sample)
+        future_rewards = self._get_future_rewards(state_next_sample)
         # Q value = reward + discount factor * expected future reward
         updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
             future_rewards, axis=1
@@ -203,58 +206,85 @@ class DQNAgent(Agent):
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
+        self._model = self.build_network()
+
+    def build_network(self):
         inputs = layers.Input(shape=(self._state_size,))
 
         layer = inputs
         for hidden_size in self._hidden_sizes:
             layer = layers.Dense(hidden_size, activation="relu")(layer)
         action = layers.Dense(self._action_size, activation="linear")(layer)
+        model = Model(inputs=inputs, outputs=action)
+        model.compile(loss='mse', optimizer=self._optimizer, metrics=["mae"])
+        return model
 
-        self._model = Model(inputs=inputs, outputs=action)
-        self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+    def _get_future_rewards(self, state_next_sample):
+        return self._model.predict(state_next_sample)
 
     def __str__(self):
         return "dqn-agent"
 
-class LSTMAgent(Agent):
-
-    #TODO: Organize input_shape
-    def lstm_model(self,input_shape):
-        self.model = keras.Sequential()
-
-        #2 LSTM layers
-        #5 perchè le mosse che posso eseguire sono 5: destra, sinistra, avanti, indietro, fermo
-        self.model.add(keras.layers.LSTM(5, input_shape = input_shape, return_sequences= True))
-        self.model.add(keras.layers.LSTM(5))
-
-        #dense layer
-        self.model.add(keras.layers.Dense(5, activation='relu'))
-
-        #mitigate overfitting
-        self.model.add(keras.layers.Dropout(0.3))
-
-        #output layer
-        self.model.add(keras.layers.Dense(5, activation='softmax'))
-
-
-    def act(self, obs):
-        if self.eps > np.random.rand(1)[0] and self._exploration:
-            action = np.random.choice(self._action_size)
-        else:
-            state_tensor = tf.convert_to_tensor(obs)
-            state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = self._model(state_tensor, training=False)
-            action = tf.argmax(action_probs[0]).numpy()
-        return action
-
-    def step(self, obs, action, reward, next_obs, done):
-        pass
-
-    def save(self, filename):
-        self._model.save(filename)
+class DoubleDQNAgent(DQNAgent):
 
     def load(self, filename):
-        pass
+        super().load(filename)
+        self.create_target()
+    
+    def create(self):
+        super().create()
+        self.create_target()
+    
+    def init_params(self):
+        super().init_params()
+        
+        self._target_update = self._params['target_update']
+
+    def create_target(self):
+        self._model_target = keras.models.clone_model(self._model)
+        self._model_target.build((self._state_size,))
+        self._model_target.set_weights(self._model.get_weights())
+
+    def step(self, obs, action, reward, next_obs, done):
+        super().step(obs, action, reward, next_obs, done)
+        if self._step_count % self._target_update == 0:
+            # update the the target network with new weights
+            self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights()))
+
+    def _get_future_rewards(self, state_next_sample):
+        return self._model_target.predict(state_next_sample)
 
     def __str__(self):
-        return "lstm-agent"
+        return "double-dqn-agent"
+
+class DuelingDQNAgent(DQNAgent):
+
+    def build_network(self):
+        inputs = layers.Input(shape=(self._state_size,))
+
+        X_layer = inputs
+        for hidden_size in self._hidden_sizes:
+            X_layer = layers.Dense(hidden_size, activation="relu")(X_layer)
+        # action = layers.Dense(self._action_size, activation="linear")(X_layer)
+        X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
+        X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
+
+        # value layer
+        V_layer = Dense(1, activation='linear', name='V')(X_layer)  # V(S)
+        # advantage layer
+        A_layer = Dense(self._action_size, activation='linear', name='Ai')(X_layer)  # A(s,a)
+        A_layer = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), name='Ao')(A_layer)  # A(s,a)
+        # Q layer (V + A)
+        Q = Add(name='Q')([V_layer, A_layer])  # Q(s,a)
+        Q_model = Model(inputs=[inputs], outputs=[Q], name='qvalue')
+        Q_model.compile(loss='mse', optimizer=self._optimizer)
+        return Q_model
+
+
+    def __str__(self):
+        return "dueling-dqn-agent"
+
+class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
+
+    def __str__(self):
+        return "dddqn-agent"
