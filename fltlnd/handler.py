@@ -36,13 +36,14 @@ class ExcHandler:
         self._logger_class = getattr(logger_classes, self._sys_params['log_class'])
 
         self._obs_wrapper = self._obs_class(self._obs_params)
-        self._env_handler = EnvHandler(self._obs_wrapper.builder, self._rendering)
+        self._env_handler = EnvHandler(self._sys_params['base_dir'] + "parameters/environments.json", self._obs_wrapper.builder, 
+            self._rendering)
 
         # The action space of flatland is 5 discrete actions
         self._action_size = 5
         self._state_size = self._obs_wrapper.get_state_size()
 
-        self._logger = self._logger_class(self._log_params, self._tuning)
+        self._logger = self._logger_class(self._sys_params['base_dir'], self._log_params, self._tuning)
 
     def start(self, n_episodes):
         start_time = time.time()
@@ -158,8 +159,8 @@ class ExcHandler:
             return time.time() - start_time
 
 class EnvHandler:
-    def __init__(self, obs_builder, rendering=False):
-        with open("parameters/environments.json") as json_file:
+    def __init__(self, env_filename, obs_builder, rendering=False):
+        with open(env_filename) as json_file:
             self._full_env_params = json.load(json_file)
 
         self._obs_builder = obs_builder
