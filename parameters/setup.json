@@ -23,6 +23,7 @@
         "exp_end": 0.01,
         "exp_decay": 0.997,
         "checkpoint_freq": 100,
+        "target_update": 10000,
         "env": "r0.s"
     },
     "log": {
