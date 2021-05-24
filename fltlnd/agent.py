@@ -106,48 +106,7 @@ class DQNAgent(Agent):
         self._rewards_history.append(reward)
 
         if self._step_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
-            # Get indices of samples for replay buffers
-            indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
-
-            # Using list comprehension to sample from replay buffer
-            state_sample = np.array([self._state_history[i] for i in indices])
-            state_next_sample = np.array([self._state_next_history[i] for i in indices])
-            rewards_sample = [self._rewards_history[i] for i in indices]
-            action_sample = [self._action_history[i] for i in indices]
-            done_sample = tf.convert_to_tensor(
-                [float(self._done_history[i]) for i in indices]
-            )
-
-            # Build the updated Q-values for the sampled future states
-            # Use the target model for stability
-            future_rewards = self._model_target.predict(state_next_sample)
-            # Q value = reward + discount factor * expected future reward
-            updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
-                future_rewards, axis=1
-            )
-
-            # If final frame set the last value to -1
-            updated_q_values = updated_q_values * (1 - done_sample) - done_sample
-
-            # Create a mask so we only calculate loss on the updated Q-values
-            masks = tf.one_hot(action_sample, self._action_size)
-
-            with tf.GradientTape() as tape:
-                # Train the model on the states and updated Q-values
-                q_values = self._model(state_sample)
-
-                # Apply the masks to the Q-values to get the Q-value for action taken
-                q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
-                # Calculate loss between new Q-value and old Q-value
-                loss = self._loss(updated_q_values, q_action)
-
-            # Backpropagation
-            grads = tape.gradient(loss, self._model.trainable_variables)
-            self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
-
-        if self._step_count % 10000 == 0:  # TODO update_target_network as parameter
-            # update the the target network with new weights
-            self._model_target.set_weights(self._tau * np.array(self._model.get_weights()) + (1.0 - self._tau) * np.array(self._model_target.get_weights()))
+            self.train()
 
         # Limit the state and reward history
         if len(self._rewards_history) > self._memory_size:
@@ -157,6 +116,46 @@ class DQNAgent(Agent):
             del self._action_history[:1]
             del self._done_history[:1]
 
+    def train(self):
+        # Get indices of samples for replay buffers
+        indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
+
+        # Using list comprehension to sample from replay buffer
+        state_sample = np.array([self._state_history[i] for i in indices])
+        state_next_sample = np.array([self._state_next_history[i] for i in indices])
+        rewards_sample = [self._rewards_history[i] for i in indices]
+        action_sample = [self._action_history[i] for i in indices]
+        done_sample = tf.convert_to_tensor(
+            [float(self._done_history[i]) for i in indices]
+        )
+
+        # Build the updated Q-values for the sampled future states
+        # Use the target model for stability
+        future_rewards = self._model_target.predict(state_next_sample)
+        # Q value = reward + discount factor * expected future reward
+        updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
+            future_rewards, axis=1
+        )
+
+        # If final frame set the last value to -1
+        updated_q_values = updated_q_values * (1 - done_sample) - done_sample
+
+        # Create a mask so we only calculate loss on the updated Q-values
+        masks = tf.one_hot(action_sample, self._action_size)
+
+        with tf.GradientTape() as tape:
+            # Train the model on the states and updated Q-values
+            q_values = self._model(state_sample)
+
+            # Apply the masks to the Q-values to get the Q-value for action taken
+            q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
+            # Calculate loss between new Q-value and old Q-value
+            loss = self._loss(updated_q_values, q_action)
+
+        # Backpropagation
+        grads = tape.gradient(loss, self._model.trainable_variables)
+        self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
+        
     def load(self, filename):
         self.init_params()
 
@@ -172,7 +171,6 @@ class DQNAgent(Agent):
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         self._model = keras.models.load_model(filename)
-        self.create_target()
 
     def save(self, filename, overwrite=False):
         self._model.save(filename, overwrite=overwrite)
@@ -190,7 +188,7 @@ class DQNAgent(Agent):
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
-        
+
     def create(self):
         self.init_params()
 
@@ -215,52 +213,8 @@ class DQNAgent(Agent):
         self._model = Model(inputs=inputs, outputs=action)
         self._model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
 
-        self.create_target()
-
-    def create_target(self):
-
-        self._model_target = keras.models.clone_model(self._model)
-        self._model_target.build((self._state_size,))
-        self._model_target.compile(optimizer='Adam', loss='mse', metrics=["mae"])
-        self._model_target.set_weights(self._model.get_weights())
-
     def __str__(self):
         return "dqn-agent"
-
-
-class DDDQNAgent(Agent):
-
-    def act(self, obs):
-        pass
-
-    def step(self, obs, action, reward, next_obs, done):
-        pass
-
-    def save(self, filename):
-        pass
-
-    def load(self, filename):
-        pass
-
-    def __str__(self):
-        return "dddqn-agent"
-
-class PPOAgent(Agent):
-
-    def act(self, obs):
-        pass
-
-    def step(self, obs, action, reward, next_obs, done):
-        pass
-
-    def save(self, filename):
-        pass
-
-    def load(self, filename):
-        pass
-
-    def __str__(self):
-        return "ppo-agent"
 
 class LSTMAgent(Agent):
 
