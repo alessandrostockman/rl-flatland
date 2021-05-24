@@ -22,7 +22,7 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 class Agent(ABC):
 
-    def __init__(self, state_size, action_size, params, exploration=True, train_best=True, base_dir=""):
+    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
@@ -33,6 +33,8 @@ class Agent(ABC):
             self.load_best()
         else:
             self.create()
+        
+        self._memory = memory_class(self._buffer_size, self._batch_size)
 
     @abstractmethod
     def create(self):
@@ -184,9 +186,7 @@ class DQNAgent(Agent):
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
-        self._buffer_size = 32000
-
-        self._memory = ReplayBuffer(self._buffer_size, self._batch_size)
+        self._buffer_size = self._params['buffer_size']
 
     def create(self):
         self.init_params()

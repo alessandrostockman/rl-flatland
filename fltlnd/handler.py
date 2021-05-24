@@ -18,6 +18,7 @@ from fltlnd.deadlocks import DeadlocksDetector
 import fltlnd.agent as agent_classes
 import fltlnd.obs as obs_classes
 import fltlnd.logger as logger_classes
+import fltlnd.replay_buffer as memory_classes
 
 class ExcHandler:
     def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str]):
@@ -34,6 +35,7 @@ class ExcHandler:
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
         self._logger_class = getattr(logger_classes, self._sys_params['log_class'])
+        self._memory_class = getattr(memory_classes, self._sys_params['memory_class'])
 
         self._obs_wrapper = self._obs_class(self._obs_params)
         self._env_handler = EnvHandler(self._sys_params['base_dir'] + "parameters/environments.json", self._obs_wrapper.builder, 
@@ -53,8 +55,8 @@ class ExcHandler:
         for params in self._logger.get_run_params():
             self._logger.episode_start()
             self._trn_params.update(params)
-            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, self._training, 
-                self._train_best, self._sys_params['base_dir'])
+            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, 
+            self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
             # Max number of steps per episode

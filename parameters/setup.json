@@ -4,7 +4,8 @@
         "base_dir": "",
         "obs_class": "TreeObs",
         "agent_class": "DQNAgent",
-        "log_class": "TensorboardLogger"
+        "log_class": "TensorboardLogger",
+        "memory_class": "ReplayBuffer"
     },
     "obs": {
         "tree_depth": 2,
@@ -18,6 +19,7 @@
         "tau": 1e-3,
         "gamma": 0.99,
         "buffer_min_size": 0,
+        "buffer_size": 32000,
         "hidden_sizes": [128],
         "exp_start": 1.0,
         "exp_end": 0.01,
