@@ -1,0 +1,29 @@
+{
+    "os": "Linux-5.12.6-arch1-1-x86_64-with-arch",
+    "python": "3.6.13",
+    "heartbeatAt": "2021-05-26T15:19:51.330043",
+    "startedAt": "2021-05-26T15:19:41.388351",
+    "docker": null,
+    "gpu": "NVIDIA GeForce 920M",
+    "gpu_count": 1,
+    "cpu_count": 4,
+    "cuda": null,
+    "args": [
+        "-E",
+        "5",
+        "-T",
+        "tuning"
+    ],
+    "state": "running",
+    "program": "main.py",
+    "codePath": "main.py",
+    "git": {
+        "remote": "git@github.com:alessandrostockman/dl-flatlands.git",
+        "commit": "0800e1fcf3818bb119b13756cbb6d6123e037b95"
+    },
+    "email": "alessandrostockman@gmail.com",
+    "root": "/home/alessandro/Projects/Uni/DL/Flatlands",
+    "host": "arch",
+    "username": "alessandro",
+    "executable": "/home/alessandro/.local/share/virtualenvs/Flatlands-yXF2bRGi/bin/python"
+}

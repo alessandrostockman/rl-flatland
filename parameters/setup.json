@@ -4,7 +4,7 @@
         "base_dir": "",
         "obs_class": "TreeObs",
         "agent_class": "DDDQNAgent",
-        "log_class": "TensorboardLogger",
+        "log_class": "WandBLogger",
         "memory_class": "ReplayBuffer"
     },
     "obs": {
@@ -28,7 +28,7 @@
         "env": "r0.s"
     },
     "log": {
-        "log_dir": "logs",
+        "log_dir": "tmp/logs",
         "hp_dir": "hparam_tuning",
         "attributes": ["completions", "scores", "steps", "loss", "deadlocks", "exploration_prob", "min_steps", 
             "exploration_count", "act_0", "act_1", "act_2", "act_3", "act_4"],
