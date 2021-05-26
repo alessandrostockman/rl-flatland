@@ -139,7 +139,7 @@ class WandBLogger(TensorboardLogger):
     def __init__(self, base_dir, parameters, tuning):
         log_dir = base_dir + parameters['log_dir']
 
-        wandb.tensorboard.patch(root_logdir=log_dir + "/" + super()._get_driver_dir())
+        wandb.tensorboard.patch(root_logdir=log_dir + "/" + super()._get_driver_dir(),tensorboardX=False)
         wandb.init(sync_tensorboard=True, project="rl-flatland", entity="fltlnd", dir=log_dir)
         super().__init__(base_dir, parameters, tuning=tuning)
 
