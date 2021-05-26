@@ -82,11 +82,12 @@ class TensorboardLogger(Logger):
 
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
-            self._windows[attr].append(val)
-        
-            with tf.summary.create_file_writer(self._log_dir + '/' + self._run_dir).as_default():
-                tf.summary.scalar(attr, val, step=idx)
-                tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
+            if val is not None:
+                self._windows[attr].append(val)
+            
+                with tf.summary.create_file_writer(self._log_dir + '/' + self._run_dir).as_default():
+                    tf.summary.scalar(attr, val, step=idx)
+                    tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
 
     def _init_hp(self):
         self._load_hp()
