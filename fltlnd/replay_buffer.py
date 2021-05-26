@@ -1,8 +1,7 @@
 from random import sample
-from collections import namedtuple, deque, Iterable
+from collections import deque
 
 import numpy as np
-
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
@@ -29,6 +28,4 @@ class ReplayBuffer:
     def __len__(self):
         """Return the current size of internal memory."""
         return len(self.memory)
-
-
 

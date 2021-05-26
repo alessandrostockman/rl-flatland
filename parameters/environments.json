@@ -10,6 +10,39 @@
         "grid_mode": false,
         "malfunction_duration": [20, 50]
     },
+    "t1.l1": {
+        "n_agents": 5,
+        "x_dim": 20,
+        "y_dim": 30,
+        "n_cities": 2,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "min_malfunction_interval": 50,
+        "grid_mode": false,
+        "malfunction_duration": [20, 50]
+    },
+    "t1.l2": {
+        "n_agents": 7,
+        "x_dim": 30,
+        "y_dim": 40,
+        "n_cities": 5,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "min_malfunction_interval": 50,
+        "grid_mode": false,
+        "malfunction_duration": [20, 50]
+    },
+    "t1.l3": {
+        "n_agents": 10,
+        "x_dim": 40,
+        "y_dim": 60,
+        "n_cities": 9,
+        "max_rails_between_cities": 4,
+        "max_rails_in_city": 3,
+        "min_malfunction_interval": 50,
+        "grid_mode": false,
+        "malfunction_duration": [20, 50]
+    },
     "r1.s": {
         "n_agents": 5,
         "x_dim": 25,

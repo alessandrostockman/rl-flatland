@@ -61,7 +61,7 @@ class TensorboardLogger(Logger):
 
     def episode_end(self, params, scores, episode_idx):
         if self._hp_tuning:
-            with tf.summary.create_file_writer(self._log_dir + '/' + self._hp_dir + '/' + self._run_dir).as_default():
+            with tf.summary.create_file_writer(self._base_dir + '/' + self._log_dir + '/' + self._hp_dir + '/' + self._run_dir).as_default():
                 hp.hparams(dict(zip(self._hparams, params.values())))
                 tf.summary.scalar('scores', scores, step=episode_idx)
 
@@ -82,11 +82,12 @@ class TensorboardLogger(Logger):
 
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
-            self._windows[attr].append(val)
-        
-            with tf.summary.create_file_writer(self._log_dir + '/' + self._run_dir).as_default():
-                tf.summary.scalar(attr, val, step=idx)
-                tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
+            if val is not None:
+                self._windows[attr].append(val)
+            
+                with tf.summary.create_file_writer(self._base_dir + '/' + self._log_dir + '/' + self._run_dir).as_default():
+                    tf.summary.scalar(attr, val, step=idx)
+                    tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
 
     def _init_hp(self):
         self._load_hp()
@@ -96,7 +97,7 @@ class TensorboardLogger(Logger):
         # hp.Metric("batch_accuracy",group="train",display_name="accuracy (train)",), 
         # hp.Metric("batch_loss", group="train", display_name="loss (train)",)
 
-        with tf.summary.create_file_writer(self._log_dir + '/' + self._hp_dir).as_default():
+        with tf.summary.create_file_writer(self._base_dir + '/' + self._log_dir + '/' + self._hp_dir).as_default():
             hp.hparams_config(
                 hparams=self._hparams,
                 metrics=[self._metric],

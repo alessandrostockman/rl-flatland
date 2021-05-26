@@ -3,8 +3,9 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "DQNAgent",
-        "log_class": "TensorboardLogger"
+        "agent_class": "DDDQNAgent",
+        "log_class": "TensorboardLogger",
+        "memory_class": "ReplayBuffer"
     },
     "obs": {
         "tree_depth": 2,
