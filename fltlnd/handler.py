@@ -158,7 +158,7 @@ class ExcHandler:
                 self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
                     self._logger.get_window('completions'), action_probs, end)
 
-            return time.time() - start_time
+        return time.time() - start_time
 
 class EnvHandler:
     def __init__(self, env_filename, obs_builder, rendering=False):
