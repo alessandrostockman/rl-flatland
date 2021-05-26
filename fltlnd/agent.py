@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import os
 import numpy as np
-
 import tensorflow as tf
 from tensorflow import keras
 import pickle
@@ -20,6 +19,7 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 # disable_eager_execution()  # Disable Eager, IMPORTANT!
 
+#TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
 
     def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
