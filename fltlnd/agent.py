@@ -75,6 +75,14 @@ class Agent(ABC):
     def __str__(self):
         pass
 
+    @abstractmethod
+    def episode_start(self):
+        pass
+
+    @abstractmethod
+    def episode_end(self):
+        pass
+
 
 class RandomAgent(Agent):
 
@@ -88,6 +96,12 @@ class RandomAgent(Agent):
         pass
 
     def load(self, filename):
+        pass
+
+    def episode_start(self):
+        pass
+
+    def episode_end(self):
         pass
 
     def __str__(self):
@@ -107,6 +121,9 @@ class DQNAgent(Agent):
             action_probs = self._model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
 
     def episode_end(self):
         # Decay probability of taking random action
