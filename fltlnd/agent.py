@@ -34,7 +34,7 @@ class Agent(ABC):
         else:
             self.create()
         
-        self._memory = memory_class(self._buffer_size, self._batch_size)
+        self._memory = memory_class(self._memory_size, self._batch_size)
 
     @abstractmethod
     def create(self):
@@ -186,7 +186,6 @@ class DQNAgent(Agent):
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
-        self._buffer_size = self._params['buffer_size']
 
     def create(self):
         self.init_params()
