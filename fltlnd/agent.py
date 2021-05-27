@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import os
 import numpy as np
-
 import tensorflow as tf
 from tensorflow import keras
 import pickle
@@ -20,6 +19,7 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 # disable_eager_execution()  # Disable Eager, IMPORTANT!
 
+#TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
 
     def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
@@ -34,7 +34,7 @@ class Agent(ABC):
         else:
             self.create()
         
-        self._memory = memory_class(self._buffer_size, self._batch_size)
+        self._memory = memory_class(self._memory_size, self._batch_size)
 
     @abstractmethod
     def create(self):
@@ -75,6 +75,14 @@ class Agent(ABC):
     def __str__(self):
         pass
 
+    @abstractmethod
+    def episode_start(self):
+        pass
+
+    @abstractmethod
+    def episode_end(self):
+        pass
+
 
 class RandomAgent(Agent):
 
@@ -88,6 +96,12 @@ class RandomAgent(Agent):
         pass
 
     def load(self, filename):
+        pass
+
+    def episode_start(self):
+        pass
+
+    def episode_end(self):
         pass
 
     def __str__(self):
@@ -107,6 +121,9 @@ class DQNAgent(Agent):
             action_probs = self._model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
 
     def episode_end(self):
         # Decay probability of taking random action
@@ -186,7 +203,6 @@ class DQNAgent(Agent):
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
-        self._buffer_size = self._params['buffer_size']
 
     def create(self):
         self.init_params()
@@ -284,3 +300,126 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
 
     def __str__(self):
         return "dddqn-agent"
+
+
+class ActorCriticAgent(Agent):
+
+    def build_actor_network(self):
+        state_input = Input(shape=(self._state_size,))
+        h1 = Dense(24, activation='relu')(state_input)
+        h2 = Dense(48, activation='relu')(h1)
+        h3 = Dense(24, activation='relu')(h2)
+        output = Dense(self._action_size,  
+            activation='relu')(h3)
+        
+        model = Model(input=state_input, output=output)
+        return state_input, model
+
+    def build_critic_network(self):
+        state_input = Input(shape=(self._state_size,))
+        state_h1 = Dense(24, activation='relu')(state_input)
+        state_h2 = Dense(48)(state_h1)
+        action_input = Input(shape=(self._action_size,))
+        action_h1 = Dense(48)(action_input)
+        merged = Add()([state_h2, action_h1])
+        merged_h1 = Dense(24, activation='relu')(merged)
+        output = Dense(1, activation='relu')(merged_h1)
+        model = Model(input=[state_input,action_input], output=output)
+        
+        return state_input, action_input, model
+
+    def act(self, obs):
+        return np.random.choice(np.arange(self._action_size))
+
+    def step(self, obs, action, reward, next_obs, done):
+        pass
+
+    def load(self, filename):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._model = keras.models.load_model(filename)
+
+    def save(self, filename, overwrite=True):
+        self._model.save(filename, overwrite=overwrite)
+    
+    def init_params(self):
+        self.stats = {
+            "eps_val": self._params['exp_start'],
+            "eps_counter": 0,
+            "loss": None
+        }
+
+        self._eps_end = self._params['exp_end']
+        self._eps_decay = self._params['exp_decay']
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every']
+        self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
+        self._gamma = self._params['gamma']
+        self._buffer_min_size = self._params['batch_size']
+        self._hidden_sizes = self._params['hidden_sizes']
+        self._buffer_size = 32000
+        self._memory = ReplayBuffer(self._buffer_size, self._batch_size)
+    
+    def create(self):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.mse()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+        
+        #Creation actor
+        self.actor_state_input, self.actor_model = self.build_actor_network()
+        _, self.target_actor_model = self.build_actor_network()
+        self._actor_critic_grad = tf.compat.v1.placeholder(tf.float32, [None, self._action_size])
+        self._actor_model_weights = self.actor_model.trainable_weights
+        self._actor_grads = tf.gradients(self.actor_model.output, self._actor_model_weights, -self._actor_critic_grad)
+        self._grads= zip(self._actor_grads, self._actor_model_weights)
+        self._optimize_actor = tf.compat.v1.train.AdamOptimizer(
+            self._learning_rate
+        ).apply_gradients(self._grads)
+
+        #Creation Critic
+        self.critic_state_input, self.critic_action_input,self.critic_model = self.build_critic_network()
+        _ , _ , self.target_critic_model = self.build_critic_network()
+
+        self.critic_grads = tf.gradients(self.critic_model.output, self.critic_action_input)
+
+        # # Initialize for later gradient calculations
+		# self.sess.run(tf.initialize_all_variables())
+
+    def train_critic(self, samples):
+        for sample in samples:
+            state_sample, action_sample, rewards_sample, state_next_sample, done_sample = sample
+            if not done_sample:
+                target_action = self.target_actor_model.predict(state_next_sample)
+                future_reward = self.target_critic_model.predict(
+                    [state_next_sample, target_action])[0][0]
+                rewards_sample += self._gamma * future_reward
+            self.critic_model.fit([state_sample, action_sample], rewards_sample, verbose=0)
+    
+    def train_actor(self,samples):
+        for sample in samples:
+            state_sample, action_sample, rewards_sample, state_next_sample, _ = sample
+            predicted_action = self.actor_model.predict(state_next_sample)
+            grads = self.sess.run(self.critic_grads, feed_dict={
+                self.critic_state_input:  state_sample,
+                self.critic_action_input: predicted_action
+            })[0]
+
+            self.sess.run(self.optimize, feed_dict={
+                self.actor_state_input: state_sample,
+                self.actor_critic_grad: grads
+            })
+
+
+
+    def __str__(self):
+        return "ActorCritic-agent"

@@ -1,5 +1,5 @@
 {
-    "buffer_size": {
+    "memory_size": {
         "type": "discrete",
         "values": [50000, 100000, 500000, 1000000]
     },

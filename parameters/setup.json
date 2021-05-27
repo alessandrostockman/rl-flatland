@@ -3,8 +3,8 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "DQNAgent",
-        "log_class": "TensorboardLogger",
+        "agent_class": "DDDQNAgent",
+        "log_class": "WandBLogger",
         "memory_class": "ReplayBuffer"
     },
     "obs": {
@@ -19,7 +19,6 @@
         "tau": 1e-3,
         "gamma": 0.99,
         "buffer_min_size": 0,
-        "buffer_size": 32000,
         "hidden_sizes": [128],
         "exp_start": 1.0,
         "exp_end": 0.01,
@@ -29,7 +28,7 @@
         "env": "r0.s"
     },
     "log": {
-        "log_dir": "logs",
+        "log_dir": "tmp/logs",
         "hp_dir": "hparam_tuning",
         "attributes": ["completions", "scores", "steps", "loss", "deadlocks", "exploration_prob", "min_steps", 
             "exploration_count", "act_0", "act_1", "act_2", "act_3", "act_4"],

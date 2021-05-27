@@ -64,6 +64,8 @@ class ExcHandler:
                     self._env_handler.get_num_agents() / self._env_handler._params['n_cities'])))
 
             for episode_idx in range(n_episodes):
+                self._policy.episode_start()
+
                 score = 0
                 deadlocks = 0
                 action_dict = dict()
