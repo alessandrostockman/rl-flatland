@@ -279,10 +279,10 @@ class DuelingDQNAgent(DQNAgent):
         # X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
         # X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
 
-        V_layer = Dense(128, activation='relu', name='V')(X_layer)
-        V_layer = Dense(1, activation='linear', name='V')(V_layer)  # V(S)
+        V_layer = Dense(128, activation='relu')(X_layer)
+        V_layer = Dense(1, activation='linear')(V_layer)  # V(S)
 
-        A_layer = Dense(128, activation='relu', name='V')(X_layer)
+        A_layer = Dense(128, activation='relu')(X_layer)
         A_layer = Dense(self._action_size, activation='linear', name='Ai')(A_layer)
         A_layer = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), name='Ao')(A_layer)  # A(s,a)
 
