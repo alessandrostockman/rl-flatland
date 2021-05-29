@@ -87,7 +87,7 @@ class ExcHandler:
                         agent_prev_obs[agent] = agent_obs[agent].copy()
 
                 count_steps = 0
-                # Run episode
+                # Run episode 
                 for step in range(self._max_steps - 1):
                     count_steps += 1
                     for agent in self._env_handler.get_agents_handle():
@@ -139,7 +139,7 @@ class ExcHandler:
                     "loss": self._policy.stats['loss'],
                     "deadlocks": deadlocks / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
                     "exploration_prob": self._policy.stats['eps_val'],
-                    "exploration_count": self._policy.stats['eps_counter'],
+                    "exploration_count": self._policy.stats['eps_counter'] / action_count,
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
