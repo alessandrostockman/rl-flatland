@@ -275,16 +275,14 @@ class DuelingDQNAgent(DQNAgent):
         inputs = layers.Input(shape=(self._state_size,))
 
         X_layer = inputs
-        for hidden_size in self._hidden_sizes:
-            X_layer = layers.Dense(hidden_size, activation="relu")(X_layer)
         # action = layers.Dense(self._action_size, activation="linear")(X_layer)
-        X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
+        X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(inputs)
         X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
 
         # value layer
         V_layer = Dense(1, activation='linear', name='V')(X_layer)  # V(S)
         # advantage layer
-        A_layer = Dense(self._action_size, activation='linear', name='Ai')(X_layer)  # A(s,a)
+        A_layer = Dense(self._action_size, activation='linear', name='Ai')(inputs)  # A(s,a)
         A_layer = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), name='Ao')(A_layer)  # A(s,a)
         # Q layer (V + A)
         Q = Add(name='Q')([V_layer, A_layer])  # Q(s,a)
