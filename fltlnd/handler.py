@@ -139,7 +139,7 @@ class ExcHandler:
                     "loss": self._policy.stats['loss'],
                     "deadlocks": deadlocks / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
                     "exploration_prob": self._policy.stats['eps_val'],
-                    "exploration_count": self._policy.stats['eps_counter'] / action_count,
+                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
