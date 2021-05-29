@@ -275,6 +275,23 @@ class DuelingDQNAgent(DQNAgent):
         inputs = layers.Input(shape=(self._state_size,))
 
         X_layer = inputs
+        X_layer = Dense(128, activation='relu', kernel_initializer='he_uniform')(X_layer)
+        # X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
+        # X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
+
+        V_layer = Dense(128, activation='relu', name='V')(X_layer)
+        V_layer = Dense(1, activation='linear', name='V')(V_layer)  # V(S)
+
+        A_layer = Dense(128, activation='relu', name='V')(X_layer)
+        A_layer = Dense(self._action_size, activation='linear', name='Ai')(A_layer)
+        A_layer = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), name='Ao')(A_layer)  # A(s,a)
+
+        # Q layer (V + A)
+        Q = Add(name='Q')([V_layer, A_layer])  # Q(s,a)
+        Q_model = Model(inputs=[inputs], outputs=[Q], name='qvalue')
+        Q_model.compile(loss='mse', optimizer=self._optimizer)
+        return Q_model
+
         # action = layers.Dense(self._action_size, activation="linear")(X_layer)
         X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(inputs)
         X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
