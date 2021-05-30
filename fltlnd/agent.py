@@ -87,6 +87,7 @@ class Agent(ABC):
 class RandomAgent(Agent):
 
     def act(self, obs):
+        self.stats['eps_counter'] += 1
         return np.random.choice(np.arange(self._action_size))
 
     def step(self, obs, action, reward, next_obs, done):
@@ -98,11 +99,27 @@ class RandomAgent(Agent):
     def load(self, filename):
         pass
 
+    def load_best(self):
+        self.create()
+
     def episode_start(self):
         pass
 
     def episode_end(self):
         pass
+
+    def create(self):
+        self.init_params()
+
+    def init_params(self):
+        self.stats = {
+            "eps_val": 1,
+            "eps_counter": 0,
+            "loss": 0
+        }
+
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
 
     def __str__(self):
         return "random-agent"
