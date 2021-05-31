@@ -57,12 +57,13 @@ class Logger(ABC):
 
 class TensorboardLogger(Logger):
 
-    def episode_start(self):
+    def episode_start(self, run_params):
         self._run_dir = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self._windows = {}
-        for attr in self._attributes:
-            self._windows[attr] = deque(maxlen=100)
+        for attr in self._attributes.keys():
+            if "avg" in self._attributes[attr]:
+                self._windows[attr] = deque(maxlen=100)
 
     def episode_end(self, params, scores, episode_idx):
         if self._hp_tuning:
@@ -88,11 +89,13 @@ class TensorboardLogger(Logger):
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
             if val is not None:
-                self._windows[attr].append(val)
             
                 with tf.summary.create_file_writer(self._base_dir + self._log_dir + '/' + self._run_dir).as_default():
-                    tf.summary.scalar(attr, val, step=idx)
-                    tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
+                    if "val" in self._attributes[attr]:
+                        tf.summary.scalar(attr + "_val", val, step=idx)
+                    if "avg" in self._attributes[attr]:
+                        self._windows[attr].append(val)
+                        tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
 
     def _init_hp(self):
         self._load_hp()
@@ -168,3 +171,6 @@ class WandBLogger(TensorboardLogger):
     #     else:
     #         yield [{}]
          
+    def episode_start(self, run_params):
+        wandb.config.update(run_params)
+        return super().episode_start(run_params)

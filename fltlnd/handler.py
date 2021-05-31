@@ -53,8 +53,8 @@ class ExcHandler:
         np.random.seed(self._sys_params['seed'])
 
         for params in self._logger.get_run_params():
-            self._logger.episode_start()
             self._trn_params.update(params)
+            self._logger.episode_start(self._trn_params)
             self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, 
             self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
