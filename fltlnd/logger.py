@@ -15,7 +15,7 @@ class Logger(ABC):
     def __init__(self, base_dir, parameters, tuning=False):
         self._attributes = parameters['attributes']
         self._base_dir = base_dir
-        self._log_dir = parameters['log_dir'] + "/" + self._get_driver_dir()
+        self._log_dir = parameters['log_dir']
         self._hp_tuning = tuning
 
         if self._hp_tuning:
@@ -24,11 +24,11 @@ class Logger(ABC):
             self._init_hp()
     
     @abstractmethod
-    def episode_start(self):
+    def run_start(self):
         pass
     
     @abstractmethod
-    def episode_end(self, params, scores, episode_idx):
+    def run_end(self, params, scores, episode_idx):
         pass
 
     @abstractmethod
@@ -57,7 +57,7 @@ class Logger(ABC):
 
 class TensorboardLogger(Logger):
 
-    def episode_start(self, run_params):
+    def run_start(self, run_params):
         self._run_dir = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self._windows = {}
@@ -65,11 +65,23 @@ class TensorboardLogger(Logger):
             if "avg" in self._attributes[attr]:
                 self._windows[attr] = deque(maxlen=100)
 
-    def episode_end(self, params, scores, episode_idx):
+    def run_end(self, params, scores, run_idx):
         if self._hp_tuning:
-            with tf.summary.create_file_writer(self._base_dir + self._log_dir + '/' + self._hp_dir + '/' + self._run_dir).as_default():
+            with tf.summary.create_file_writer(self.get_hp_run_dir()).as_default():
                 hp.hparams(dict(zip(self._hparams, params.values())))
-                tf.summary.scalar('scores', scores, step=episode_idx)
+                tf.summary.scalar('scores', scores, step=run_idx)
+
+    def get_log_dir(self):
+        return self._base_dir + self._log_dir
+        
+    def get_hp_run_dir(self):
+        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._hp_dir + '/' + self._run_dir
+
+    def get_hp_dir(self):
+        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._hp_dir
+
+    def get_run_dir(self):
+        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._run_dir
 
     def get_run_params(self):
         if self._hp_tuning:
@@ -90,7 +102,7 @@ class TensorboardLogger(Logger):
         for attr, val in pack.items():
             if val is not None:
             
-                with tf.summary.create_file_writer(self._base_dir + self._log_dir + '/' + self._run_dir).as_default():
+                with tf.summary.create_file_writer(self.get_run_dir()).as_default():
                     if "val" in self._attributes[attr]:
                         tf.summary.scalar(attr + "_val", val, step=idx)
                     if "avg" in self._attributes[attr]:
@@ -98,20 +110,6 @@ class TensorboardLogger(Logger):
                         tf.summary.scalar(attr + "_avg", np.mean(self._windows[attr]), step=idx)
 
     def _init_hp(self):
-        self._load_hp()
-        self._metric = hp.Metric('scores') #TODO: Check if more metrics are needed
-        # hp.Metric("epoch_accuracy",group="validation",display_name="accuracy (val.)",),
-        # hp.Metric("epoch_loss",group="validation",display_name="loss (val.)",),
-        # hp.Metric("batch_accuracy",group="train",display_name="accuracy (train)",), 
-        # hp.Metric("batch_loss", group="train", display_name="loss (train)",)
-
-        with tf.summary.create_file_writer(self._base_dir + self._log_dir + '/' + self._hp_dir).as_default():
-            hp.hparams_config(
-                hparams=self._hparams,
-                metrics=[self._metric],
-            )
-
-    def _load_hp(self):
         self._hparams = []
         self._parameter_list = {}
         self._combinations = []
@@ -133,17 +131,27 @@ class TensorboardLogger(Logger):
 
                 self._hparams.append(hp_obj)
             self._combinations = [dict(zip(self._parameter_list, x)) for x in itertools.product(*self._parameter_list.values())]
+
+        self._metric = hp.Metric('scores') #TODO: Check if more metrics are needed
+        # hp.Metric("epoch_accuracy",group="validation",display_name="accuracy (val.)",),
+        # hp.Metric("epoch_loss",group="validation",display_name="loss (val.)",),
+        # hp.Metric("batch_accuracy",group="train",display_name="accuracy (train)",), 
+        # hp.Metric("batch_loss", group="train", display_name="loss (train)",)
             
+
+        with tf.summary.create_file_writer(self.get_hp_dir()).as_default():
+            hp.hparams_config(
+                hparams=self._hparams,
+                metrics=[self._metric],
+            )
+
     def _get_driver_dir(self):
         return "tensorboard"
 
 class WandBLogger(TensorboardLogger):
 
     def __init__(self, base_dir, parameters, tuning):
-        log_dir = base_dir + parameters['log_dir']
-
-        wandb.tensorboard.patch(root_logdir=log_dir + "/" + super()._get_driver_dir(),tensorboardX=False)
-        wandb.init(sync_tensorboard=True, project="rl-flatland", entity="fltlnd", dir=log_dir)
+        wandb.init(project="rl-flatland", entity="fltlnd", dir=base_dir + parameters['log_dir'])
         super().__init__(base_dir, parameters, tuning=tuning)
 
     #     if self._hp_tuning:
@@ -171,6 +179,8 @@ class WandBLogger(TensorboardLogger):
     #     else:
     #         yield [{}]
          
-    def episode_start(self, run_params):
+    def run_start(self, run_params):
+        super().run_start(run_params)
+
         wandb.config.update(run_params)
-        return super().episode_start(run_params)
+        wandb.tensorboard.patch(root_logdir=self.get_run_dir(), tensorboardX=False)
