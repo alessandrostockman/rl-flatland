@@ -57,8 +57,8 @@ class Logger(ABC):
 
 class TensorboardLogger(Logger):
 
-    def run_start(self, run_params):
-        self._run_dir = datetime.now().strftime("%Y%m%d-%H%M%S")
+    def run_start(self, run_params, agent_name):
+        self._run_dir = agent_name + "-" + datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self._windows = {}
         for attr in self._attributes.keys():
@@ -179,8 +179,10 @@ class WandBLogger(TensorboardLogger):
     #     else:
     #         yield [{}]
          
-    def run_start(self, run_params):
-        super().run_start(run_params)
-
-        wandb.config.update(run_params)
+    def run_start(self, run_params, agent_name):
+        super().run_start(run_params, agent_name)
+        
+        wandb.run.name = agent_name + "-" + wandb.run.id
+        wandb.run.save()
+        wandb.config.update(run_params, allow_val_change=True)
         wandb.tensorboard.patch(root_logdir=self.get_run_dir(), tensorboardX=False)
