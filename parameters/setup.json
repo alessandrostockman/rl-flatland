@@ -3,7 +3,7 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "DDDQNAgent",
+        "agent_class": "AltDDDQNAgent",
         "log_class": "WandBLogger",
         "memory_class": "ReplayBuffer"
     },
@@ -30,8 +30,21 @@
     "log": {
         "log_dir": "tmp/logs",
         "hp_dir": "hparam_tuning",
-        "attributes": ["completions", "scores", "steps", "loss", "deadlocks", "exploration_prob", "min_steps", 
-            "exploration_count", "act_0", "act_1", "act_2", "act_3", "act_4"],
+        "attributes": {
+            "completions": ["avg"], 
+            "scores": ["avg"], 
+            "steps": ["avg"], 
+            "loss": ["avg"], 
+            "deadlocks": ["avg"], 
+            "exploration_prob": ["val"], 
+            "min_steps": [], 
+            "exploration_count": ["val"], 
+            "act_0": ["avg"], 
+            "act_1": ["avg"], 
+            "act_2": ["avg"], 
+            "act_3": ["avg"], 
+            "act_4": ["avg"]
+        },
         "hp_params_filename": "parameters/hp.json"
     }
 }
