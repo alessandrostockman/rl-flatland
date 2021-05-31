@@ -21,11 +21,17 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@colab
 
       # Runs a set of commands using the runners shell
       - name: Merge into colab branch
         run: |
           echo Test
-          git checkout colab
           git merge dev
+
+      #- name: Merge development -> colab
+      #  uses: devmasx/merge-branch@v1.3.1
+      #  with:
+      #    type: now
+      #    target_branch: colab
+      #    github_token: ${{ github.token }}
