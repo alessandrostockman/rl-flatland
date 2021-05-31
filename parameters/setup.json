@@ -3,7 +3,7 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "AltDDDQNAgent",
+        "agent_class": "DQNAgent",
         "log_class": "WandBLogger",
         "memory_class": "ReplayBuffer"
     },
