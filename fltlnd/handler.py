@@ -30,7 +30,7 @@ class ExcHandler:
         self._rendering = rendering
         self._training = training_mode is not TrainingMode.OFF
         self._tuning = training_mode is TrainingMode.TUNING
-        self._train_best = training_mode is TrainingMode.BEST
+        self._train_best = training_mode in [TrainingMode.BEST, TrainingMode.OFF]
 
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
