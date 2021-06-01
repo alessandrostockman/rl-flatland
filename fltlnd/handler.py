@@ -21,7 +21,7 @@ import fltlnd.logger as logger_classes
 import fltlnd.replay_buffer as memory_classes
 
 class ExcHandler:
-    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str]):
+    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str], synclog: bool):
         self._sys_params = params['sys'] # System
         self._obs_params = params['obs'] # Observation
         self._trn_params = params['trn'] # Training
@@ -45,7 +45,7 @@ class ExcHandler:
         self._action_size = 5
         self._state_size = self._obs_wrapper.get_state_size()
 
-        self._logger = self._logger_class(self._sys_params['base_dir'], self._log_params, self._tuning)
+        self._logger = self._logger_class(self._sys_params['base_dir'], self._log_params, self._tuning, synclog)
 
     def start(self, n_episodes):
         start_time = time.time()
