@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import os
 import numpy as np
+from numpy.core.arrayprint import dtype_short_repr
+from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
 import pickle
@@ -158,7 +160,6 @@ class DQNAgent(Agent):
             self.train()
 
     def train(self):
-
         # Get samples from replay buffer
         state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
 
@@ -169,7 +170,7 @@ class DQNAgent(Agent):
         updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
             future_rewards, axis=1
         )
-
+        
         # If final frame set the last value to -1
         updated_q_values = updated_q_values * (1 - done_sample) - done_sample
 
@@ -189,6 +190,7 @@ class DQNAgent(Agent):
         # Backpropagation
         grads = tape.gradient(loss, self._model.trainable_variables)
         self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
+        self._memory.update(loss)
 
     def load(self, filename):
         self.init_params()
@@ -447,7 +449,6 @@ class ActorCriticAgent(Agent):
         return "ActorCritic-agent"
 
 class AltDDDQNAgent(Agent):
-
     def episode_start(self):
         self.stats['eps_counter'] = 0
 
