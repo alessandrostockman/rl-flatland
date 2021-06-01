@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from fltlnd.utils import TrainingMode
 import json
@@ -152,7 +153,7 @@ class ExcHandler:
                     action_count = [1] * self._action_size
 
                     if self._training:
-                        self._policy.save('./tmp/checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
+                        self._policy.save(os.path.join(self._sys_params['base_dir'], 'tmp', 'checkpoints', str(self._policy) + '-' + str(episode_idx) + '.pth'))
                         self._policy.save_best()
 
                 else:

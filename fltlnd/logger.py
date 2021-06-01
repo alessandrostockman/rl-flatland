@@ -75,14 +75,14 @@ class TensorboardLogger(Logger):
     def get_log_dir(self):
         return self._base_dir + self._log_dir
         
-    def get_hp_run_dir(self):
-        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._hp_dir + '/' + self._run_dir
+    def get_hp_run_dir(self): #base dir no slash
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir, self.run_dir)
 
     def get_hp_dir(self):
-        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._hp_dir
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir)
 
     def get_run_dir(self):
-        return self._base_dir + self._log_dir + "/" + self._get_driver_dir() + '/' + self._run_dir
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._run_dir)
 
     def get_run_params(self):
         if self._hp_tuning:

@@ -63,7 +63,7 @@ class Agent(ABC):
         pass
 
     def load_best(self):
-        filename = self._base_dir + 'checkpoints/' + str(self)
+        filename = os.path.join(self._base_dir, 'checkpoints', str(self))
 
         if os.path.exists(filename):
             self.load(filename)
@@ -71,7 +71,7 @@ class Agent(ABC):
             self.create()
 
     def save_best(self):
-        self.save(self._base_dir + 'checkpoints/' + str(self))
+        self.save(os.path.join(self._base_dir, 'checkpoints', str(self)))
 
     @abstractmethod
     def __str__(self):
