@@ -21,7 +21,7 @@ import fltlnd.logger as logger_classes
 import fltlnd.replay_buffer as memory_classes
 
 class ExcHandler:
-    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str]):
+    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str], synclog: bool):
         self._sys_params = params['sys'] # System
         self._obs_params = params['obs'] # Observation
         self._trn_params = params['trn'] # Training
@@ -45,7 +45,7 @@ class ExcHandler:
         self._action_size = 5
         self._state_size = self._obs_wrapper.get_state_size()
 
-        self._logger = self._logger_class(self._sys_params['base_dir'], self._log_params, self._tuning)
+        self._logger = self._logger_class(self._sys_params['base_dir'], self._log_params, self._tuning, synclog)
 
     def start(self, n_episodes):
         start_time = time.time()
@@ -54,7 +54,7 @@ class ExcHandler:
 
         for run_id, params in enumerate(self._logger.get_run_params()):
             self._trn_params.update(params)
-            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, 
+            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params,
             self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
             self._logger.run_start(self._trn_params, str(self._policy))
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
@@ -138,7 +138,7 @@ class ExcHandler:
                     "scores": score / (self._max_steps * self._env_handler.env.get_num_agents()),
                     "steps": count_steps / self._max_steps,
                     "loss": self._policy.stats['loss'],
-                    "deadlocks": deadlocks / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
+                    "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
                     "exploration_prob": self._policy.stats['eps_val'],
                     "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
                     # "min_steps": min_steps / ?
@@ -205,6 +205,7 @@ class EnvHandler:
                 number_of_agents=self.n_agents,
                 obs_builder_object=self._obs_builder,
                 malfunction_generator=mal_gen.ParamMalfunctionGen(self.mal_params),
+                close_following=False
             )
         except AttributeError:
             self.env = RailEnv(
