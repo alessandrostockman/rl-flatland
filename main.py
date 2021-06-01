@@ -10,9 +10,10 @@ def main(episodes: int, training: str, rendering: bool, checkpoint: Optional[str
         parameters = json.load(json_file)
 
     ex = ExcHandler(parameters, {
-        'off': TrainingMode.OFF,
+        'eval': TrainingMode.EVAL,
         'tuning': TrainingMode.TUNING,
         'best': TrainingMode.BEST,
+        'fresh': TrainingMode.FRESH,
     }[training], rendering, checkpoint)
     ex.start(episodes)
 
@@ -24,10 +25,11 @@ if __name__ == "__main__":
                         action='store_true')
     parser.add_argument('-T', '--training', dest="training", 
     help='''Training modes:
-        off - Executes the environment without training the model |
+        eval - Executes the environment without training the model |
         tuning - Enables tuning of hyperparameters |
-        best - Loads the best checkpoint for the chosen model (checkpoints/{model}) and trains it
-    ''', default="best", choices=['off', 'tuning', 'best'])
+        best - Loads the best checkpoint for the chosen model (checkpoints/{model}) and trains it |
+        fresh - Starts the training without loading a checkpoint
+    ''', default="best", choices=['eval', 'tuning', 'best', 'fresh'])
     parser.add_argument('-C', '--checkpoint', dest="checkpoint", help="Cusotm checkpoint path", default=None)
     args = parser.parse_args()
 

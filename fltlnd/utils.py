@@ -3,9 +3,10 @@ import numpy as np
 from flatland.envs.observations import TreeObsForRailEnv
 
 class TrainingMode(Enum):
-    OFF = 1
+    EVAL = 1
     TUNING = 2
     BEST = 3
+    FRESH = 4
 
 def max_lt(seq, val):
     """
