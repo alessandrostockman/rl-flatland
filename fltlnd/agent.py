@@ -263,6 +263,7 @@ class DoubleDQNAgent(DQNAgent):
         super().init_params()
 
         self._target_update = self._params['target_update']
+        self._soft_update = self._params['soft_update']
 
     def create_target(self):
         self._model_target = keras.models.clone_model(self._model)
@@ -271,13 +272,17 @@ class DoubleDQNAgent(DQNAgent):
 
     def step(self, obs, action, reward, next_obs, done):
         super().step(obs, action, reward, next_obs, done)
-        if self._step_count % self._target_update == 0:
+        if self._step_count % self._target_update == 0 or self._soft_update:
             # update the the target network with new weights
             weights = self._model.get_weights()
             target_weights = self._model_target.get_weights()
-            for i in range(len(weights)):
-                target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
+
+            if self._soft_update:
+                for i in range(len(weights)):
+                    target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
+                    
             self._model_target.set_weights(target_weights)
+        
 
     def _get_future_rewards(self, state_next_sample):
         return self._model_target.predict(state_next_sample)
