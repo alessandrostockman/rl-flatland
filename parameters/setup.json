@@ -3,9 +3,9 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "ActorCriticAgent",
-        "log_class": "TensorboardLogger",
-        "memory_class": "ReplayBuffer"
+        "agent_class": "DDDQNAgent",
+        "log_class": "WandBLogger",
+        "memory_class": "PrioritizedExperienceReplay"
     },
     "obs": {
         "tree_depth": 2,
@@ -25,6 +25,7 @@
         "exp_decay": 0.997,
         "checkpoint_freq": 100,
         "target_update": 10000,
+        "soft_update": true,
         "env": "t1.l0"
     },
     "log": {
