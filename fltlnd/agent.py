@@ -4,6 +4,7 @@ import numpy as np
 from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow import keras
 import pickle
 
@@ -15,9 +16,11 @@ from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Add
 from tensorflow.keras import backend as K
 
+from fltlnd.actorCriticNetwork import ActorCriticNetwork
 from fltlnd.replay_buffer import ReplayBuffer
 from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework.ops import disable_eager_execution
+
 
 # disable_eager_execution()  # Disable Eager, IMPORTANT!
 
@@ -35,7 +38,7 @@ class Agent(ABC):
             self.load_best()
         else:
             self.create()
-        
+
         self._memory = memory_class(self._memory_size, self._batch_size)
 
     @abstractmethod
@@ -151,7 +154,7 @@ class DQNAgent(Agent):
     def step(self, obs, action, reward, next_obs, done):
         self._step_count += 1
 
-        #Save experience in replay memory
+        # Save experience in replay memory
         self._memory.add(obs, action, reward, next_obs, done)
 
         # If enough samples are available in memory, get random subset and learn
@@ -160,6 +163,7 @@ class DQNAgent(Agent):
             self.train()
 
     def train(self):
+
         # Get samples from replay buffer
         state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
 
@@ -218,6 +222,7 @@ class DQNAgent(Agent):
         self._batch_size = self._params['batch_size']
         self._update_every = self._params['update_every']
         self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
@@ -296,12 +301,12 @@ class DoubleDQNAgent(DQNAgent):
 class DuelingDQNAgent(DQNAgent):
 
     def build_network(self):
-
         inputs = layers.Input(shape=(self._state_size,))
 
         X_layer = inputs
         for hidden_size in self._hidden_sizes:
             X_layer = layers.Dense(hidden_size, activation="relu")(X_layer)
+        # action = layers.Dense(self._action_size, activation="linear")(X_layer)
         X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
         X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
 
@@ -328,45 +333,16 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
 
 class ActorCriticAgent(Agent):
 
-    def build_actor_network(self):
-        state_input = Input(shape=(self._state_size,))
-        h1 = Dense(24, activation='relu')(state_input)
-        h2 = Dense(48, activation='relu')(h1)
-        h3 = Dense(24, activation='relu')(h2)
-        output = Dense(self._action_size,  
-            activation='relu')(h3)
-        
-        model = Model(input=state_input, output=output)
-        return state_input, model
-
-    def build_critic_network(self):
-        state_input = Input(shape=(self._state_size,))
-        state_h1 = Dense(24, activation='relu')(state_input)
-        state_h2 = Dense(48)(state_h1)
-        action_input = Input(shape=(self._action_size,))
-        action_h1 = Dense(48)(action_input)
-        merged = Add()([state_h2, action_h1])
-        merged_h1 = Dense(24, activation='relu')(merged)
-        output = Dense(1, activation='relu')(merged_h1)
-        model = Model(input=[state_input,action_input], output=output)
-        
-        return state_input, action_input, model
-
-    def act(self, obs):
-        return np.random.choice(np.arange(self._action_size))
-
-    def step(self, obs, action, reward, next_obs, done):
-        pass
-
-    def load(self, filename):
+    def create(self):
         self.init_params()
 
         self._step_count = 0
 
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+        self.actor_critic_model = ActorCriticNetwork(n_actions=self._action_size, state_size=self._state_size)
 
-        self._model = keras.models.load_model(filename)
+        self.actor_critic_model.compile(optimizer=self._optimizer)
 
     def save(self, filename, overwrite=True):
         self._model.save(filename, overwrite=overwrite)
@@ -390,67 +366,121 @@ class ActorCriticAgent(Agent):
         self._hidden_sizes = self._params['hidden_sizes']
         self._buffer_size = 32000
         self._memory = ReplayBuffer(self._buffer_size, self._batch_size)
-    
-    def create(self):
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+    def act(self, obs):
+        # if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration:
+        #     action = np.random.choice(self._action_size)
+        #     self.stats['eps_counter'] += 1
+        # else:
+        #     state_tensor = tf.convert_to_tensor([obs,], dtype=tf.float32)
+        #     state_tensor = tf.expand_dims(state_tensor, 0)
+        #     _, action_probs = self.actor_critic_model(state_tensor, training=False)
+        #     # action = tf.argmax(action_probs[0]).numpy() #action scelta nelle act precedenti
+        #
+        #     action_probabilities = tfp.distributions.Categorical(probs=action_probs)
+        #     action = action_probabilities.sample()
+        #     log_prob = action_probabilities.log_prob(action)
+        #     action = action.numpy()[0]
+        #
+        # self.action = action
+        # return action
+        state = tf.convert_to_tensor([obs])
+        _, probs = self.actor_critic_model(state)
+
+        action_probabilities = tfp.distributions.Categorical(probs=probs)
+        action = action_probabilities.sample()
+        log_prob = action_probabilities.log_prob(action)
+        self.action = action
+
+        return action.numpy()[0]
+
+    def step(self, obs, action, reward, next_obs, done):
+        self._step_count += 1
+
+        # Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
+
+        # If enough samples are available in memory, get random subset and learn
+        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
+                self._memory) > self._batch_size:
+            self.train()
+
+    def train(self):
+        # Get samples from replay buffer
+        state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
+        state = tf.convert_to_tensor([state_sample], dtype=tf.float32)
+        state_ = tf.convert_to_tensor([state_next_sample], dtype=tf.float32)
+        reward = tf.convert_to_tensor(rewards_sample, dtype=tf.float32)  # not fed to NN
+        with tf.GradientTape(persistent=True) as tape:
+            state_value, probs = self.actor_critic_model(state)
+            state_value_, _ = self.actor_critic_model(state_)
+            state_value = tf.squeeze(state_value)
+            state_value_ = tf.squeeze(state_value_)
+            # done = tf.squeeze(done_sample)
+
+            action_probs = tfp.distributions.Categorical(probs=probs)
+            log_prob = action_probs.log_prob(self.action)
+
+            # Q value = reward + discount factor * expected future reward
+            # updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
+            #     future_rewards, axis=1)
+            # # If final frame set the last value to -1
+            # updated_q_values = updated_q_values * (1 - done_sample) - done_sample
+            # delta = reward + self.gamma*state_value_*(1-int(done)) - state_value
+
+            delta = reward + self._gamma * state_value_ * (1 - done_sample) - state_value
+            actor_loss = -log_prob * delta
+            critic_loss = delta ** 2
+            total_loss = actor_loss + critic_loss
+
+        gradient = tape.gradient(total_loss, self.actor_critic_model.trainable_variables)
+        self.actor_critic_model.optimizer.apply_gradients(zip(
+            gradient, self.actor_critic_model.trainable_variables))
+
+    def save(self, filename, overwrite=False):
+        self.actor_critic_model.save(filename, overwrite=overwrite)
+
+    def load(self, filename):
         self.init_params()
 
         self._step_count = 0
 
-        self._loss = keras.losses.mse()
+        self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
         
-        #Creation actor
-        self.actor_state_input, self.actor_model = self.build_actor_network()
-        _, self.target_actor_model = self.build_actor_network()
-        self._actor_critic_grad = tf.compat.v1.placeholder(tf.float32, [None, self._action_size])
-        self._actor_model_weights = self.actor_model.trainable_weights
-        self._actor_grads = tf.gradients(self.actor_model.output, self._actor_model_weights, -self._actor_critic_grad)
-        self._grads= zip(self._actor_grads, self._actor_model_weights)
-        self._optimize_actor = tf.compat.v1.train.AdamOptimizer(
-            self._learning_rate
-        ).apply_gradients(self._grads)
-
-        #Creation Critic
-        self.critic_state_input, self.critic_action_input,self.critic_model = self.build_critic_network()
-        _ , _ , self.target_critic_model = self.build_critic_network()
+    
+        self.actor_critic_model = keras.models.load_model(filename)
 
         self.critic_grads = tf.gradients(self.critic_model.output, self.critic_action_input)
 
         # # Initialize for later gradient calculations
 		# self.sess.run(tf.initialize_all_variables())
 
-    def train_critic(self, samples):
-        for sample in samples:
-            state_sample, action_sample, rewards_sample, state_next_sample, done_sample = sample
-            if not done_sample:
-                target_action = self.target_actor_model.predict(state_next_sample)
-                future_reward = self.target_critic_model.predict(
-                    [state_next_sample, target_action])[0][0]
-                rewards_sample += self._gamma * future_reward
-            self.critic_model.fit([state_sample, action_sample], rewards_sample, verbose=0)
-    
-    def train_actor(self,samples):
-        for sample in samples:
-            state_sample, action_sample, rewards_sample, state_next_sample, _ = sample
-            predicted_action = self.actor_model.predict(state_next_sample)
-            grads = self.sess.run(self.critic_grads, feed_dict={
-                self.critic_state_input:  state_sample,
-                self.critic_action_input: predicted_action
-            })[0]
-
-            self.sess.run(self.optimize, feed_dict={
-                self.actor_state_input: state_sample,
-                self.actor_critic_grad: grads
-            })
-
-
 
     def __str__(self):
-        return "ActorCritic-agent"
+        return "actorcritic-agent"
+
 
 class AltDDDQNAgent(Agent):
     def episode_start(self):
         self.stats['eps_counter'] = 0
+class ACAgent(Agent):
+    def create(self):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._actor, self._critic, self._policy = self.build_network()
 
     def init_params(self):
         self.stats = {
@@ -459,192 +489,100 @@ class AltDDDQNAgent(Agent):
             "loss": None
         }
 
-        # environment
-        self.num_actions = 5  # hard coded, in handler ExcHandler
-        # Reset environment -> done in the handler
-
-        # training
-        self._batch_size = self._params['batch_size']
-        self.steps = 0  # number of steps ran
-        self.learn_every = 10  # interval of steps to fit model
-        self._update_every = self._params['update_every']  # interval of steps to update target model
-        self._learning_rate = self._params['learning_rate']  # alpha
-        self._gamma = self._params['gamma']
-        self._eps = self._params['exp_start']
-        self._eps_decay = self._params['exp_decay']
         self._eps_end = self._params['exp_end']
-
-        self._tau = self._params['tau']  # TODO Capire se serve
+        self._eps_decay = self._params['exp_decay']
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every']
+        self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
+        self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
-        self._training = True
 
-        # memory
-        self._memory_size = self._params['memory_size']
-        # self.memory = deque(maxlen=self._params['memory_size'])  # replay memory
-        self.log = []  # stores information from training
-
-    def create(self): #TODO
-        self.init_params()
-
-        self._step_count = 0
-
-        self._action_history = []
-        self._state_history = []
-        self._state_next_history = []
-        self._done_history = []
-        self._rewards_history = []
-
-        self._loss = keras.losses.Huber()
-        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
-
-        # models
-        self.q_eval = self.build_network()  # Q eval model
-        self.q_target = self.build_network()  # Q target model
+        self._fc1_dims = 1024
+        self._fc2_dims = 512
 
     def build_network(self):
-        # Build the Dueling DQN Network
-        inputs = layers.Input(shape=(self._state_size,))
+        input = Input(shape=(self._state_size,))
+        delta = Input(shape=[1])
+        dense1 = Dense(self._fc1_dims, activation='relu')(input)
+        dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
+        probs = Dense(self._action_size, activation='softmax')(dense2)
+        values = Dense(1, activation='linear')(dense2)
 
-        X_layer = inputs
-        for hidden_size in self._hidden_sizes:
-            X_layer = layers.Dense(hidden_size, activation="relu")(X_layer)
-        # action = layers.Dense(self._action_size, activation="linear")(X_layer)
-        X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
-        X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
+        actor = Model(inputs=[input, delta], outputs=[probs])
 
-        # value layer
-        V_layer = Dense(1, activation='linear', name='V')(X_layer)  # V(S)
-        # advantage layer
-        A_layer = Dense(self.num_actions, activation='linear', name='Ai')(X_layer)  # A(s,a)
-        A_layer = Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), name='Ao')(A_layer)  # A(s,a)
-        # Q layer (V + A)
-        Q = Add(name='Q')([V_layer, A_layer])  # Q(s,a)
-        Q_model = Model(inputs=[inputs], outputs=[Q], name='qvalue')
-        Q_model.compile(loss='mse', optimizer=self._optimizer)
-        return Q_model
+        actor.compile(optimizer=Adam(lr=self._learning_rate), loss=self._loss)
 
-    def update_target(self):
-            self.q_target.set_weights(self.q_eval.get_weights())
+        critic = Model(inputs=[input], outputs=[values])
+
+        critic.compile(optimizer=Adam(lr=self._learning_rate), loss='mean_squared_error')
+
+        policy = Model(inputs=[input], outputs=[probs])
+
+        return actor, critic, policy
 
     def act(self, obs):
-        # Predict next action based on current state and decay epsilon.
-        if self._eps > np.random.rand(1)[0] and self._exploration:  # when training allow random exploration
-            if np.random.random() < self._eps:  # get random action
-                action = np.random.choice(self._action_size)
-            else:  # predict best action
-                state_tensor = tf.convert_to_tensor(obs)
-                state_tensor = tf.expand_dims(state_tensor, 0)
-                action_probs = self.q_eval(state_tensor, training=False)
-                action = tf.argmax(action_probs[0]).numpy()
-        else:  # if not training then always get best action
-            state_tensor = tf.convert_to_tensor(obs)
-            state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = self.q_eval(state_tensor, training=False)
-            action = tf.argmax(action_probs[0]).numpy()
+        state = obs[np.newaxis, :]
+        probabilities = self._policy.predict(state)[0]
+        action = np.random.choice(self._action_size, p=probabilities)
+
         return action
 
-    def episode_end(self):
-        # Decay probability of taking random action
-        self._eps = max(self._eps_end, self._eps_decay * self._eps)
-
-    def step(self, obs, action, reward, next_obs, done): #TODO
+    def step(self, obs, action, reward, next_obs, done):
         self._step_count += 1
 
-        # Save actions and states in replay buffer
-        self._action_history.append(action)
-        self._state_history.append(obs)
-        self._state_next_history.append(next_obs)
-        self._done_history.append(done)
-        self._rewards_history.append(reward)
+        # Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
 
-        # immagino di essere nel learn
-        if self._step_count % self._update_every == 0 and len(self._done_history) > self._buffer_min_size:
-            # Get indices of samples for replay buffers
-            indices = np.random.choice(range(len(self._done_history)), size=self._batch_size)
-
-            # Using list comprehension to sample from replay buffer
-            state_sample = np.array([self._state_history[i] for i in indices])
-            state_next_sample = np.array([self._state_next_history[i] for i in indices])
-            rewards_sample = [self._rewards_history[i] for i in indices]
-            action_sample = [self._action_history[i] for i in indices]
-            done_sample = tf.convert_to_tensor(
-                [float(self._done_history[i]) for i in indices]
-            )
-
-            # TODO update q values
-            # Q = self.q_eval.predict(state_sample)  # get Q values for starting states
-            # Q_next = self.q_eval.predict(state_next_sample)  # get Q values for ending states
-            # Q_target = self.q_target.predict(state_next_sample)  # get Q values from target model
-            #
-            # for i in range(self._batch_size):
-            #     if done:
-            #         Q[i][action[i]] = 0.0  # terminal state
-            #     else:
-            #         a = np.argmax(Q_next[i])  ## a'_max = argmax(Q(s',a'))
-            #         Q[i][action[i]] = reward[i] + self._gamma * Q_target[i][a]  # Q_max = Q_target(s',a'_max)
-            #     # fit network on batch_size = minibatch_size
-            # self.q_eval.fit(state_sample, Q, batch_size=self._batch_size, verbose=0, shuffle=False)
+        # If enough samples are available in memory, get random subset and learn
+        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
+                self._memory) > self._batch_size:
+            self.train()
 
 
-            # Build the updated Q-values for the sampled future states
-            # Use the target model for stability
-            future_rewards = self.q_target.predict(state_next_sample)
-            # Q value = reward + discount factor * expected future reward
-            updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
-                future_rewards, axis=1
-            )
+    def train(self):
+        state, action, reward, state_, done = self._memory.get_last()
+        state = state[np.newaxis, :]
+        state_ = state_[np.newaxis, :]
+        critic_value_ = self._critic.predict(state_)
+        critic_value = self._critic.predict(state)
 
-            # If final frame set the last value to -1
-            updated_q_values = updated_q_values * (1 - done_sample) - done_sample
+        target = reward + self._gamma * critic_value_ * (1 - int(done))
+        delta = target - critic_value
 
-            # Create a mask so we only calculate loss on the updated Q-values
-            masks = tf.one_hot(action_sample, self._action_size)
+        actions = np.zeros([1, self._action_size])
+        actions[np.arange(1), action] = 1
 
-            with tf.GradientTape() as tape:
-                # Train the model on the states and updated Q-values
-                q_values = self.q_eval(state_sample)
+        self._actor.fit([state, delta], actions, verbose=0)
 
-                # Apply the masks to the Q-values to get the Q-value for action taken
-                q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
-                # Calculate loss between new Q-value and old Q-value
-                loss = self._loss(updated_q_values, q_action)
-
-            # Backpropagation
-            grads = tape.gradient(loss, self.q_eval.trainable_variables)
-            self._optimizer.apply_gradients(zip(grads, self.q_eval.trainable_variables))
-
-        if self._step_count % 10000 == 0:  # TODO update_target_network as parameter
-            # update the the target network with new weights
-            self.update_target()
-
-        # Limit the state and reward history
-        if len(self._rewards_history) > self._memory_size:
-            del self._rewards_history[:1]
-            del self._state_history[:1]
-            del self._state_next_history[:1]
-            del self._action_history[:1]
-            del self._done_history[:1]
+        self._critic.fit(state, target, verbose=0)
 
 
-    def save(self, filename):
-        self.q_eval.save(filename)
+    def save(self, filename, overwrite=False):
+        self._actor.save(filename, overwrite=overwrite)
+        #TODO save critic e policy
 
     def load(self, filename):
         self.init_params()
 
         self._step_count = 0
 
-        self._action_history = []
-        self._state_history = []
-        self._state_next_history = []
-        self._done_history = []
-        self._rewards_history = []
-
         self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
-        self.q_eval = keras.models.load_model(filename)
-        self.q_target = self.build_network()  # Q target model
+        self._actor = keras.models.load_model(filename)
+        #TODO load critic and model
 
     def __str__(self):
-        return "alt-dddqn-agent"
+        return "ac-agent"
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+
