@@ -55,7 +55,7 @@ class ExcHandler:
         for params in self._logger.get_run_params():
             self._logger.episode_start()
             self._trn_params.update(params)
-            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params, 
+            self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params,
             self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
@@ -135,7 +135,7 @@ class ExcHandler:
                     "scores": score / (self._max_steps * self._env_handler.env.get_num_agents()),
                     "steps": count_steps / self._max_steps,
                     "loss": self._policy.stats['loss'],
-                    "deadlocks": deadlocks / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
+                    "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
                     "exploration_prob": self._policy.stats['eps_val'],
                     "exploration_count": self._policy.stats['eps_counter'],
                     # "min_steps": min_steps / ?
