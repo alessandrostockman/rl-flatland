@@ -216,7 +216,6 @@ class DQNAgent(Agent):
         self._batch_size = self._params['batch_size']
         self._update_every = self._params['update_every']
         self._learning_rate = self._params['learning_rate']
-        self._tau = self._params['tau']
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
@@ -262,6 +261,7 @@ class DoubleDQNAgent(DQNAgent):
     def init_params(self):
         super().init_params()
 
+        self._tau = self._params['tau']
         self._target_update = self._params['target_update']
         self._soft_update = self._params['soft_update']
 
@@ -280,7 +280,7 @@ class DoubleDQNAgent(DQNAgent):
             if self._soft_update:
                 for i in range(len(weights)):
                     target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
-                    
+
             self._model_target.set_weights(target_weights)
         
 
