@@ -28,9 +28,9 @@ class ExcHandler:
         self._log_params = params['log'] # Policy
 
         self._rendering = rendering
-        self._training = training_mode is not TrainingMode.OFF
+        self._training = training_mode is not TrainingMode.EVAL
         self._tuning = training_mode is TrainingMode.TUNING
-        self._train_best = training_mode in [TrainingMode.BEST, TrainingMode.OFF]
+        self._train_best = training_mode in [TrainingMode.BEST, TrainingMode.EVAL]
 
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
