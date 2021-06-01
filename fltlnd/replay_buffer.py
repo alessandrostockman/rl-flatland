@@ -20,6 +20,9 @@ class Buffer:
         """Sample a batch of experiences from memory."""
         pass
 
+    @abstractmethod
+    def update(self, idx, error):
+        pass
     
     def __len__(self):
         """Return the current size of internal memory"""
@@ -49,6 +52,9 @@ class ReplayBuffer(Buffer):
         state, action, reward, next_state, done = [np.squeeze(i) for i in zip(*mini_batch)]
 
         return state, action, reward, next_state, done
+        
+    def update(self, idx, error):
+        pass
 
     def __len__(self):
         """Return the current size of internal memory."""
