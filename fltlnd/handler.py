@@ -205,6 +205,7 @@ class EnvHandler:
                 number_of_agents=self.n_agents,
                 obs_builder_object=self._obs_builder,
                 malfunction_generator=mal_gen.ParamMalfunctionGen(self.mal_params),
+                close_following=False
             )
         except AttributeError:
             self.env = RailEnv(
