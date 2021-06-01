@@ -177,7 +177,7 @@ class SumTree:
 
         #if we exceeded the capacity, we go back to the initial point (overwrite)
         if self.data_pointer >= self.capacity: 
-            self.write = 0
+            self.data_pointer = 0
 
     def update(self, idx, priority):
 
