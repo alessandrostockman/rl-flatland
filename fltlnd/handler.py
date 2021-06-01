@@ -28,9 +28,9 @@ class ExcHandler:
         self._log_params = params['log'] # Policy
 
         self._rendering = rendering
-        self._training = training_mode is not TrainingMode.OFF
+        self._training = training_mode is not TrainingMode.EVAL
         self._tuning = training_mode is TrainingMode.TUNING
-        self._train_best = training_mode is TrainingMode.BEST
+        self._train_best = training_mode in [TrainingMode.BEST, TrainingMode.EVAL]
 
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
@@ -52,18 +52,21 @@ class ExcHandler:
         random.seed(self._sys_params['seed'])
         np.random.seed(self._sys_params['seed'])
 
-        for params in self._logger.get_run_params():
-            self._logger.episode_start()
+        for run_id, params in enumerate(self._logger.get_run_params()):
             self._trn_params.update(params)
             self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params,
             self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
+            self._logger.run_start(self._trn_params, str(self._policy))
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
             # Max number of steps per episode
             self._max_steps = int(4 * 2 * (self._env_handler._params['x_dim'] + self._env_handler._params['y_dim'] + (
                     self._env_handler.get_num_agents() / self._env_handler._params['n_cities'])))
 
+            eval_score = None
             for episode_idx in range(n_episodes):
+                self._policy.episode_start()
+
                 score = 0
                 deadlocks = 0
                 action_dict = dict()
@@ -85,7 +88,7 @@ class ExcHandler:
                         agent_prev_obs[agent] = agent_obs[agent].copy()
 
                 count_steps = 0
-                # Run episode
+                # Run episode 
                 for step in range(self._max_steps - 1):
                     count_steps += 1
                     for agent in self._env_handler.get_agents_handle():
@@ -137,13 +140,12 @@ class ExcHandler:
                     "loss": self._policy.stats['loss'],
                     "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
                     "exploration_prob": self._policy.stats['eps_val'],
-                    "exploration_count": self._policy.stats['eps_counter'],
+                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
-
+                eval_score = score
                 self._policy.episode_end()
-                self._logger.episode_end(params, score / (self._max_steps * self._env_handler.env.get_num_agents()), episode_idx)
 
                 if episode_idx % self._trn_params['checkpoint_freq'] == 0:
                     end = "\n"
@@ -152,11 +154,16 @@ class ExcHandler:
                     if self._training:
                         self._policy.save('./tmp/checkpoints/' + str(self._policy) + '-' + str(episode_idx) + '.pth/')
                         self._policy.save_best()
+
                 else:
                     end = " "
 
                 self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
                     self._logger.get_window('completions'), action_probs, end)
+
+                #TODO Evaluation once every tot
+
+            self._logger.run_end(params, eval_score / (self._max_steps * self._env_handler.env.get_num_agents()), run_id)
 
         return time.time() - start_time
 
