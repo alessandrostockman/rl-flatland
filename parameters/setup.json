@@ -4,8 +4,8 @@
         "base_dir": "",
         "obs_class": "TreeObs",
         "agent_class": "DQNAgent",
-        "log_class": "WandBLogger",
-        "memory_class": "ReplayBuffer"
+        "log_class": "TensorboardLogger",
+        "memory_class": "PrioritizedExperienceReplay"
     },
     "obs": {
         "tree_depth": 2,
