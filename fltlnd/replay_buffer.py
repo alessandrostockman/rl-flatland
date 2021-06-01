@@ -64,11 +64,17 @@ class PrioritizedExperienceReplay(Buffer):
     def _getPriority(self, error):
         return (error + self.eta) ** self.alpha
 
-    def add(self, error, sample):
+    def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
+        sample = state, action, reward, next_state, done
+          # Find the max priority
+        max_priority = np.max(self.tree.tree[-self.tree.capacity:])
 
-        p = self._getPriority(error)
-        self.tree.add(p, sample) 
+        # If the max priority = 0 we can't put priority = 0 since this experience will never have a chance to be selected
+        # So we use a minimum priority
+        if max_priority == 0:
+            max_priority = 1
+        self.tree.add(max_priority, sample) 
 
     def sample(self, n):
         batch = []
