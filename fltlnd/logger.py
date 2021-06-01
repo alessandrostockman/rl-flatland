@@ -4,6 +4,7 @@ from datetime import datetime
 from collections import deque
 
 from abc import ABC, abstractmethod
+import os
 import numpy as np
 
 import tensorflow as tf
@@ -12,7 +13,7 @@ import wandb
 
 class Logger(ABC):
 
-    def __init__(self, base_dir, parameters, tuning=False):
+    def __init__(self, base_dir, parameters, tuning=False, sync=False):
         self._attributes = parameters['attributes']
         self._base_dir = base_dir
         self._log_dir = parameters['log_dir']
@@ -150,9 +151,11 @@ class TensorboardLogger(Logger):
 
 class WandBLogger(TensorboardLogger):
 
-    def __init__(self, base_dir, parameters, tuning):
+    def __init__(self, base_dir, parameters, tuning, sync=False):
+        if not sync:
+            os.environ["WANDB_MODE"] = "offline"
         wandb.init(project="rl-flatland", entity="fltlnd", dir=base_dir + parameters['log_dir'])
-        super().__init__(base_dir, parameters, tuning=tuning)
+        super().__init__(base_dir, parameters, tuning=tuning, sync=sync)
 
     #     if self._hp_tuning:
     #         sweep_config = {
