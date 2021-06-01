@@ -37,6 +37,9 @@ class ReplayBuffer(Buffer):
         """Add a new experience to memory."""
         self.memory.append([state, action, reward, next_state, done])
 
+    def get_last(self):
+        return self.memory.__getitem__(self.memory.__len__()-1)
+
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
 
