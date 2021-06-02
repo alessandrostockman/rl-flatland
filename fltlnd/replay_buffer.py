@@ -5,36 +5,34 @@ from collections import deque
 import numpy as np
 
 class Buffer:
+
     def __init__(self, buffer_size, batch_size):
-        """Initialize a ReplayBuffer object."""
-        self.memory = deque(maxlen=buffer_size)
+        self.buffer_size = buffer_size
         self.batch_size = batch_size
 
     @abstractmethod
     def add(self, state, action, reward, next_state, done):
-        """Add a new experience to memory."""
         pass
 
     @abstractmethod
     def sample(self):
-        """Sample a batch of experiences from memory."""
         pass
 
     @abstractmethod
     def update(self, idx, error):
         pass
     
+    @abstractmethod
     def __len__(self):
-        """Return the current size of internal memory"""
-        return len(self.memory)
+        pass
 
 
 class ReplayBuffer(Buffer):
     """Fixed-size buffer to store experience tuples."""
-
+    
     def __init__(self, buffer_size, batch_size):
-        """Initialize a ReplayBuffer object."""
         super().__init__(buffer_size, batch_size)
+        self.memory = deque(maxlen=buffer_size)
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
@@ -64,8 +62,9 @@ class ReplayBuffer(Buffer):
 #TODO: veririficare come ottiene il sample (state, next_state, action, reward, done)
 class PrioritizedExperienceReplay(Buffer):
     def __init__(self, buffer_size, batch_size):
-        """Initialize a ReplayBuffer object."""
         super().__init__(buffer_size, batch_size)
+
+        self._internal_len = 0
         self.eta = 0.01
         self.alpha = 0.6
         self.tree = SumTree(batch_size)
@@ -83,6 +82,8 @@ class PrioritizedExperienceReplay(Buffer):
         # So we use a minimum priority
         if max_priority == 0:
             max_priority = 1
+
+        self._internal_len += 1
         self.tree.add(max_priority, sample) 
 
     def sample(self, n):
@@ -102,6 +103,9 @@ class PrioritizedExperienceReplay(Buffer):
     def update(self, idx, error):
         p = self._getPriority(error)
         self.tree.update(idx, p)
+
+    def __len__(self):
+        return self._internal_len
 
     
     
