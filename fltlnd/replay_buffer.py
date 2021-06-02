@@ -86,11 +86,11 @@ class PrioritizedExperienceReplay(Buffer):
         self._internal_len += 1
         self.tree.add(max_priority, sample) 
 
-    def sample(self, n):
+    def sample(self):
         batch = []
-        segment = self.tree.total() / n
+        segment = self.tree.total() / self.bath_size
 
-        for i in range(n):
+        for i in range(self.bath_size):
             a = segment * i
             b = segment * (i + 1)
 
