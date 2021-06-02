@@ -59,7 +59,9 @@ class ReplayBuffer(Buffer):
         return len(self.memory)
 
 
-#TODO: veririficare come ottiene il sample (state, next_state, action, reward, done)
+#TODO: il sample restituisce una tupla contenente l'idx ed il sample (state,action...) questa
+#cosa va ad influire il funzionamento dell'agent, in quanto quando facciamo il sample, estraiamo
+#(state,action...) ma nel caso del PER otteniamo la tupla ***vedere DQNAgent***
 class PrioritizedExperienceReplay(Buffer):
     def __init__(self, buffer_size, batch_size):
         super().__init__(buffer_size, batch_size)
