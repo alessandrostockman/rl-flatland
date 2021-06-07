@@ -90,9 +90,9 @@ class PrioritizedExperienceReplay(Buffer):
 
     def sample(self):
         batch = []
-        segment = self.tree.total() / self.bath_size
+        segment = self.tree.total() / self.batch_size
 
-        for i in range(self.bath_size):
+        for i in range(self.batch_size):
             a = segment * i
             b = segment * (i + 1)
 
