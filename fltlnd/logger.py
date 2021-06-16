@@ -23,6 +23,33 @@ class Logger(ABC):
             self._hp_dir = parameters['hp_dir']
             self._hp_params_filename = parameters['hp_params_filename']
             self._init_hp()
+
+    def get_log_dir(self):
+        return self._base_dir + self._log_dir
+        
+    def get_hp_run_dir(self): #base dir no slash
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir, self.run_dir)
+
+    def get_hp_dir(self):
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir)
+
+    def get_run_dir(self):
+        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._run_dir)
+
+    def get_run_params(self):
+        if self._hp_tuning:
+            return self._combinations
+        else:
+            return [{}]
+
+    def log_step(self, pack, idx):
+        self._log(pack, "step", idx) #TODO: Check if useful
+
+    def log_episode(self, pack, idx):
+        self._log(pack, "epsd", idx)
+
+    def get_window(self, key):
+        return self._windows[key]
     
     @abstractmethod
     def run_start(self):
@@ -30,18 +57,6 @@ class Logger(ABC):
     
     @abstractmethod
     def run_end(self, params, scores, episode_idx):
-        pass
-
-    @abstractmethod
-    def get_run_params(self):
-        pass
-        
-    @abstractmethod
-    def log_step(self, pack, idx):
-        pass
-
-    @abstractmethod
-    def log_episode(self, pack, idx):
         pass
 
     @abstractmethod
@@ -71,33 +86,6 @@ class TensorboardLogger(Logger):
             with tf.summary.create_file_writer(self.get_hp_run_dir()).as_default():
                 hp.hparams(dict(zip(self._hparams, params.values())))
                 tf.summary.scalar('scores', scores, step=run_idx)
-
-    def get_log_dir(self):
-        return self._base_dir + self._log_dir
-        
-    def get_hp_run_dir(self): #base dir no slash
-        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir, self.run_dir)
-
-    def get_hp_dir(self):
-        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._hp_dir)
-
-    def get_run_dir(self):
-        return os.path.join(self._base_dir, self._log_dir, self._get_driver_dir(), self._run_dir)
-
-    def get_run_params(self):
-        if self._hp_tuning:
-            return self._combinations
-        else:
-            return [{}]
-
-    def log_step(self, pack, idx):
-        self._log(pack, "step", idx) #TODO: Check if useful
-
-    def log_episode(self, pack, idx):
-        self._log(pack, "epsd", idx)
-
-    def get_window(self, key):
-        return self._windows[key]
 
     def _log(self, pack, type, idx):
         for attr, val in pack.items():
@@ -149,7 +137,53 @@ class TensorboardLogger(Logger):
     def _get_driver_dir(self):
         return "tensorboard"
 
-class WandBLogger(TensorboardLogger):
+class WandBLogger(Logger):
+
+    def __init__(self, base_dir, parameters, tuning, sync):
+        if not sync:
+            os.environ["WANDB_MODE"] = "offline"
+        wandb.init(project="rl-flatland", entity="fltlnd", dir=base_dir + parameters['log_dir'])
+        super().__init__(base_dir, parameters, tuning=tuning, sync=sync)
+
+    def run_start(self, run_params, agent_name):
+        self._run_dir = agent_name + "-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        self._windows = {}
+        for attr in self._attributes.keys():
+            if "avg" in self._attributes[attr]:
+                self._windows[attr] = deque(maxlen=100)
+        
+        wandb.run.name = agent_name + "-" + wandb.run.id
+        wandb.run.save()
+        wandb.config.update(run_params, allow_val_change=True)
+
+    def run_end(self, params, scores, run_idx):
+        if self._hp_tuning:
+            raise NotImplementedError()
+
+    def _log(self, pack, type, idx):
+        log_dict = {}
+        for attr, val in pack.items():
+            if val is not None:
+                
+                with tf.summary.create_file_writer(self.get_run_dir()).as_default():
+                    if "val" in self._attributes[attr]:
+                        key = attr + "_val"
+                    if "avg" in self._attributes[attr]:
+                        self._windows[attr].append(val)
+                        key = attr + "_avg"
+                        val = np.mean(self._windows[attr])
+                    
+                    log_dict[key] = val
+        wandb.log(log_dict)
+
+    def _init_hp(self):
+        raise NotImplementedError()
+
+    def _get_driver_dir(self):
+        return "wandb"
+
+class WandBAndTensorboardLogger(TensorboardLogger):
 
     def __init__(self, base_dir, parameters, tuning, sync=False):
         if not sync:
