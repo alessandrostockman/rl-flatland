@@ -130,20 +130,16 @@ def normalize_observation(observation, tree_depth: int, observation_radius=0):
     normalized_obs = np.concatenate((np.concatenate((data, distance)), agent_data))
     return normalized_obs
 
-
-#TODO: veririficare come memorizza il sample (state, next_state, action, reward, done)
 class SumTree:
-    data_pointer = 0
+    write = 0
 
     def __init__(self, capacity):
-        #number of leaf nodes
         self.capacity = capacity
-
-        #generation of tree with all nodes = 0
-        self.tree = np.zeros( 2*capacity - 1 ) #max 2 childrens (2*) - 1 (for root node)
-
+        self.tree = np.zeros(2 * capacity - 1)
         self.data = np.zeros(capacity, dtype=object)
+        self.n_entries = 0
 
+    # update to the root node
     def _propagate(self, idx, change):
         parent = (idx - 1) // 2
 
@@ -152,48 +148,46 @@ class SumTree:
         if parent != 0:
             self._propagate(parent, change)
 
+    # find sample on leaf node
     def _retrieve(self, idx, s):
-        left_child_index = 2 * idx + 1
-        right = left_child_index + 1
+        left = 2 * idx + 1
+        right = left + 1
 
-        if left_child_index >= len(self.tree):
+        if left >= len(self.tree):
             return idx
 
-        if s <= self.tree[left_child_index]:
-            return self._retrieve(left_child_index, s)
+        if s <= self.tree[left]:
+            return self._retrieve(left, s)
         else:
-            return self._retrieve(right, s-self.tree[left_child_index])
+            return self._retrieve(right, s - self.tree[left])
 
     def total(self):
         return self.tree[0]
 
-    def add(self, priority, data):
-        idx = self.data_pointer + self.capacity - 1
+    # store priority and sample
+    def add(self, p, data):
+        idx = self.write + self.capacity - 1
 
-        self.data[self.data_pointer] = data
-        self.update(idx, priority)
+        self.data[self.write] = data
+        self.update(idx, p)
 
-        self.data_pointer += 1
+        self.write += 1
+        if self.write >= self.capacity:
+            self.write = 0
 
-        #if we exceeded the capacity, we go back to the initial point (overwrite)
-        if self.data_pointer >= self.capacity: 
-            self.data_pointer = 0
+        if self.n_entries < self.capacity:
+            self.n_entries += 1
 
-    def update(self, ids, priority):
+    # update priority
+    def update(self, idx, p):
+        change = p - self.tree[idx]
 
-        #Change = new priority score - former priority score
-        change = priority - self.tree[ids]
-        self.tree[idx] = priority
-
-        #prorogation of changes along the whole tree
+        self.tree[idx] = p
         self._propagate(idx, change)
 
-    def get(self, samples):
-        ids = []
-        for s in samples:
-            idx = self._retrieve(0, s)
-            ids.append(idx)
-            tree_ids.append(idx)
-            data_ids = ids - self.capacity + 1
+    # get priority and sample
+    def get(self, s):
+        idx = self._retrieve(0, s)
+        dataIdx = idx - self.capacity + 1
 
-        return (ids, self.tree[ids], self.data[data_ids])
+        return (idx, self.tree[idx], self.data[dataIdx])
