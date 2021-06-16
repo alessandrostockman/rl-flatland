@@ -162,8 +162,6 @@ class DQNAgent(Agent):
             self.train()
 
     def train(self):
-        #TODO: È qua che il nostro agente effettua il sample che differisce dalla memory usata
-        #***da vedere***
         # Get samples from replay buffer
         state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
 

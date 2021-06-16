@@ -45,13 +45,13 @@ class ReplayBuffer(Buffer):
         """Randomly sample a batch of experiences from memory."""
 
         # sample memory for a minibatch
-        mini_batch = random.sample(self.memory, self.batch_size)
+        batch = random.sample(self.memory, self.batch_size)
         # separate minibatch into elements
-        state, action, reward, next_state, done = [np.squeeze(i) for i in zip(*mini_batch)]
+        state, action, reward, next_state, done = [np.squeeze(i) for i in zip(*batch)]
 
         return state, action, reward, next_state, done
         
-    def update(self, idx, error):
+    def update(self, error):
         pass
 
     def __len__(self):
@@ -62,7 +62,7 @@ class ReplayBuffer(Buffer):
 #TODO: il sample restituisce una tupla contenente l'idx ed il sample (state,action...) questa
 #cosa va ad influire il funzionamento dell'agent, in quanto quando facciamo il sample, estraiamo
 #(state,action...) ma nel caso del PER otteniamo la tupla ***vedere DQNAgent***
-class PrioritizedExperienceReplay(Buffer):
+class PrioritizedBuffer(Buffer):
     def __init__(self, buffer_size, batch_size):
         super().__init__(buffer_size, batch_size)
 
@@ -71,12 +71,12 @@ class PrioritizedExperienceReplay(Buffer):
         self.alpha = 0.6
         self.tree = SumTree(batch_size)
 
-    def _getPriority(self, error):
+    def _get_priority(self, error):
         return (error + self.eta) ** self.alpha
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
-        sample = state, action, reward, next_state, done
+        sample = [state, action, reward, next_state, done]
           # Find the max priority
         max_priority = np.max(self.tree.tree[-self.tree.capacity:])
 
@@ -89,25 +89,20 @@ class PrioritizedExperienceReplay(Buffer):
         self.tree.add(max_priority, sample) 
 
     def sample(self):
-        batch = []
         segment = self.tree.total() / self.batch_size
+        a = np.arange(self.batch_size)
+        b = a + 1
+        sample = random.uniform(a * segment, b * segment, self.batch_size)
+        ids, cosa1, cosa2 = self.tree.get_n(sample)
+        self.sample_ids = ids
+        return cosa2
 
-        for i in range(self.batch_size):
-            a = segment * i
-            b = segment * (i + 1)
+    def update(self, error):
+        p = self._get_priority(error)
 
-            s = random.uniform(a, b)
-            (idx, p, data) = self.tree.get(s)
-            batch.append((idx, data))
-
-        return batch
-
-    def update(self, idx, error):
-        p = self._getPriority(error)
-        self.tree.update(idx, p)
+        for idx in self.sample_ids:
+            self.tree.update(idx, p)
 
     def __len__(self):
         return self._internal_len
-
-    
-    
+        
