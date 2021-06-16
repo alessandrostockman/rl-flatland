@@ -179,17 +179,21 @@ class SumTree:
         if self.data_pointer >= self.capacity: 
             self.data_pointer = 0
 
-    def update(self, idx, priority):
+    def update(self, ids, priority):
 
         #Change = new priority score - former priority score
-        change = priority - self.tree[idx]
+        change = priority - self.tree[ids]
         self.tree[idx] = priority
 
         #prorogation of changes along the whole tree
         self._propagate(idx, change)
 
-    def get(self, s):
-        idx = self._retrieve(0, s)
-        dataIdx = idx - self.capacity + 1
+    def get(self, samples):
+        ids = []
+        for s in samples:
+            idx = self._retrieve(0, s)
+            ids.append(idx)
+            tree_ids.append(idx)
+            data_ids = ids - self.capacity + 1
 
-        return (idx, self.tree[idx], self.data[dataIdx])
+        return (ids, self.tree[ids], self.data[data_ids])
