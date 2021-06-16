@@ -1,4 +1,6 @@
 from abc import abstractclassmethod, abstractmethod
+
+from tensorflow.python.ops.gen_math_ops import batch_mat_mul
 from fltlnd.utils import SumTree
 import random
 from collections import deque
@@ -69,6 +71,8 @@ class PrioritizedBuffer(Buffer):
         self._internal_len = 0
         self.eta = 0.01
         self.alpha = 0.6
+        self.beta = 0.4
+        self.beta_growth = 0.001
         self.tree = SumTree(batch_size)
 
     def _get_priority(self, error):
@@ -89,13 +93,30 @@ class PrioritizedBuffer(Buffer):
         self.tree.add(max_priority, sample) 
 
     def sample(self):
+        batch = []
+        idxs = []
         segment = self.tree.total() / self.batch_size
-        a = np.arange(self.batch_size)
-        b = a + 1
-        sample = random.uniform(a * segment, b * segment, self.batch_size)
-        ids, cosa1, cosa2 = self.tree.get_n(sample)
-        self.sample_ids = ids
-        return cosa2
+        priorities = []
+
+        self.beta = np.min([1., self.beta + self.beta_growth])
+
+        for i in range(self.batch_size):
+            a = segment * i
+            b = segment * (i + 1)
+
+            s = random.uniform(a, b)
+            (idx, p, data) = self.tree.get(s)
+            priorities.append(p)
+            batch.append(data)
+            idxs.append(idx)
+
+        sampling_probabilities = priorities / self.tree.total()
+        is_weight = np.power(self.tree.n_entries * sampling_probabilities, -self.beta)
+        is_weight /= is_weight.max()
+
+        self.sample_ids = idxs
+        state, action, reward, next_state, done = [np.squeeze(i) for i in zip(*batch)]
+        return state, action, reward, next_state, done
 
     def update(self, error):
         p = self._get_priority(error)
