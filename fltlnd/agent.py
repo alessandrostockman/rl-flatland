@@ -5,6 +5,8 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow_probability as tfp
+
 import pickle
 
 # added for DDDQN
@@ -23,7 +25,7 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 # disable_eager_execution()  # Disable Eager, IMPORTANT!
 
-#TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
+# TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
 
     def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
@@ -172,7 +174,7 @@ class DQNAgent(Agent):
         updated_q_values = rewards_sample + self._gamma * tf.reduce_max(
             future_rewards, axis=1
         )
-        
+
         # If final frame set the last value to -1
         updated_q_values = updated_q_values * (1 - done_sample) - done_sample
 
@@ -287,7 +289,6 @@ class DoubleDQNAgent(DQNAgent):
                     target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
 
             self._model_target.set_weights(target_weights)
-        
 
     def _get_future_rewards(self, state_next_sample):
         return self._model_target.predict(state_next_sample)
@@ -344,7 +345,7 @@ class ActorCriticAgent(Agent):
 
     def save(self, filename, overwrite=True):
         self._model.save(filename, overwrite=overwrite)
-    
+
     def init_params(self):
         self.stats = {
             "eps_val": self._params['exp_start'],
@@ -452,15 +453,14 @@ class ActorCriticAgent(Agent):
 
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
-        
-    
+
         self.actor_critic_model = keras.models.load_model(filename)
 
-        self.critic_grads = tf.gradients(self.critic_model.output, self.critic_action_input)
+        self.critic_grads = tf.gradients(self.actor_critic_model.output, self.critic_action_input)
 
         # # Initialize for later gradient calculations
-		# self.sess.run(tf.initialize_all_variables())
 
+    # self.sess.run(tf.initialize_all_variables())
 
     def __str__(self):
         return "actorcritic-agent"
@@ -469,6 +469,8 @@ class ActorCriticAgent(Agent):
 class AltDDDQNAgent(Agent):
     def episode_start(self):
         self.stats['eps_counter'] = 0
+
+
 class ACAgent(Agent):
     def create(self):
         self.init_params()
@@ -511,11 +513,11 @@ class ACAgent(Agent):
 
         actor = Model(inputs=[input, delta], outputs=[probs])
 
-        actor.compile(optimizer=Adam(lr=self._learning_rate), loss=self._loss)
+        actor.compile(optimizer=Adam(learning_rate=self._learning_rate), loss=self._loss)
 
         critic = Model(inputs=[input], outputs=[values])
 
-        critic.compile(optimizer=Adam(lr=self._learning_rate), loss='mean_squared_error')
+        critic.compile(optimizer=Adam(learning_rate=self._learning_rate), loss='mean_squared_error')
 
         policy = Model(inputs=[input], outputs=[probs])
 
@@ -534,11 +536,7 @@ class ACAgent(Agent):
         # Save experience in replay memory
         self._memory.add(obs, action, reward, next_obs, done)
 
-        # If enough samples are available in memory, get random subset and learn
-        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
-                self._memory) > self._batch_size:
-            self.train()
-
+        self.train()
 
     def train(self):
         state, action, reward, state_, done = self._memory.get_last()
@@ -557,10 +555,9 @@ class ACAgent(Agent):
 
         self._critic.fit(state, target, verbose=0)
 
-
     def save(self, filename, overwrite=False):
         self._actor.save(filename, overwrite=overwrite)
-        #TODO save critic e policy
+        # TODO save critic e policy
 
     def load(self, filename):
         self.init_params()
@@ -571,7 +568,7 @@ class ACAgent(Agent):
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         self._actor = keras.models.load_model(filename)
-        #TODO load critic and model
+        # TODO load critic and model
 
     def __str__(self):
         return "ac-agent"
@@ -582,5 +579,3 @@ class ACAgent(Agent):
     def episode_end(self):
         # Decay probability of taking random action
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
-
-
