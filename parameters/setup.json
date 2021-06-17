@@ -5,7 +5,7 @@
         "obs_class": "TreeObs",
         "agent_class": "DDDQNAgent",
         "log_class": "WandBLogger",
-        "memory_class": "PrioritizedExperienceReplay"
+        "memory_class": "ReplayBuffer"
     },
     "obs": {
         "tree_depth": 2,
@@ -44,7 +44,9 @@
             "act_1": ["avg"], 
             "act_2": ["avg"], 
             "act_3": ["avg"], 
-            "act_4": ["avg"]
+            "act_4": ["avg"],
+            "time_act": ["avg"],
+            "time_train": ["avg"]
         },
         "hp_params_filename": "parameters/hp.json"
     }

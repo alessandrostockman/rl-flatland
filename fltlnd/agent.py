@@ -5,9 +5,9 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_probability as tfp
 
 import pickle
+import time
 
 # added for DDDQN
 from tensorflow.keras import layers
@@ -82,6 +82,10 @@ class Agent(ABC):
         pass
 
     @abstractmethod
+    def step_start(self):
+        pass
+
+    @abstractmethod
     def episode_start(self):
         pass
 
@@ -107,6 +111,9 @@ class RandomAgent(Agent):
 
     def load_best(self):
         self.create()
+
+    def step_start(self):
+        pass
 
     def episode_start(self):
         pass
@@ -144,6 +151,9 @@ class DQNAgent(Agent):
             action_probs = self._model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
+
+    def step_start(self):
+        pass
 
     def episode_start(self):
         self.stats['eps_counter'] = 0
@@ -440,12 +450,6 @@ class ACCustomAgent(Agent):
     def __str__(self):
         return "actorcriticCustom-agent"
 
-
-class AltDDDQNAgent(Agent):
-    def episode_start(self):
-        self.stats['eps_counter'] = 0
-
-
 class ACAgent(Agent):
     def create(self):
         self.init_params()
@@ -475,16 +479,19 @@ class ACAgent(Agent):
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
 
-        self._fc1_dims = 1024
-        self._fc2_dims = 512
+        # self._fc1_dims = 1024
+        # self._fc2_dims = 512
+        self._fc1_dims = 128
 
     def build_network(self):
         input = Input(shape=(self._state_size,))
         delta = Input(shape=[1])
         dense1 = Dense(self._fc1_dims, activation='relu')(input)
-        dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
-        probs = Dense(self._action_size, activation='softmax')(dense2)
-        values = Dense(1, activation='linear')(dense2)
+        # dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
+        # probs = Dense(self._action_size, activation='softmax')(dense2)
+        
+        probs = Dense(self._action_size, activation='softmax')(dense1)
+        values = Dense(1, activation='linear')(dense1)
 
         actor = Model(inputs=[input, delta], outputs=[probs])
 
@@ -493,7 +500,6 @@ class ACAgent(Agent):
         critic = Model(inputs=[input], outputs=[values])
 
         critic.compile(optimizer=Adam(learning_rate=self._learning_rate), loss='mean_squared_error')
-
         policy = Model(inputs=[input], outputs=[probs])
 
         return actor, critic, policy
@@ -543,8 +549,9 @@ class ACAgent(Agent):
         self._critic.fit(state, target, verbose=0)
 
     def save(self, filename, overwrite=False):
-        self._actor.save(filename, overwrite=overwrite)
-        # TODO save critic e policy
+        self._actor.save(os.path.join(filename, "actor"), overwrite=overwrite)
+        self._critic.save(os.path.join(filename, "ctitic"), overwrite=overwrite)
+        self._policy.save(os.path.join(filename, "policy"), overwrite=overwrite)
 
     def load(self, filename):
         self.init_params()
@@ -554,11 +561,15 @@ class ACAgent(Agent):
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
-        self._actor = keras.models.load_model(filename)
-        # TODO load critic and model
+        self._actor = keras.models.load_model(os.path.join(filename, "actor"))
+        self._critic = keras.models.load_model(os.path.join(filename, "critic"))
+        self._policy = keras.models.load_model(os.path.join(filename, "policy"))
 
     def __str__(self):
         return "ac-agent"
+
+    def step_start(self):
+        pass
 
     def episode_start(self):
         self.stats['eps_counter'] = 0
