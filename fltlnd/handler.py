@@ -139,7 +139,7 @@ class ExcHandler:
                         "time_train": train_time
                     }
                     
-                    # self._logger.log_step(log_data, step)
+                    self._logger.log_step(log_data, step)
 
                     if done['__all__']:
                         break

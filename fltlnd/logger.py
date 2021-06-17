@@ -43,7 +43,7 @@ class Logger(ABC):
             return [{}]
 
     def log_step(self, pack, idx):
-        self._log(pack, "step", idx) #TODO: Check if useful
+        self._log(pack, "step", idx)
 
     def log_episode(self, pack, idx):
         self._log(pack, "epsd", idx)
@@ -173,6 +173,9 @@ class WandBLogger(Logger):
                     val = np.mean(self._windows[attr])
                     
                 log_dict[key] = val
+
+        if type == "episode":
+            log_dict["episode"] = idx
         wandb.log(log_dict)
 
     def _init_hp(self):
