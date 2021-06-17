@@ -516,7 +516,7 @@ class ACAgent(Agent):
         # probs = Dense(self._action_size, activation='softmax')(dense2)
         
         probs = Dense(self._action_size, activation='softmax')(dense1)
-        values = Dense(1, activation='linear')(dense2)
+        values = Dense(1, activation='linear')(dense1)
 
         actor = Model(inputs=[input, delta], outputs=[probs])
 
