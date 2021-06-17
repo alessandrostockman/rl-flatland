@@ -504,15 +504,18 @@ class ACAgent(Agent):
         self._buffer_min_size = self._params['batch_size']
         self._hidden_sizes = self._params['hidden_sizes']
 
-        self._fc1_dims = 1024
-        self._fc2_dims = 512
+        # self._fc1_dims = 1024
+        # self._fc2_dims = 512
+        self._fc1_dims = 128
 
     def build_network(self):
         input = Input(shape=(self._state_size,))
         delta = Input(shape=[1])
         dense1 = Dense(self._fc1_dims, activation='relu')(input)
-        dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
-        probs = Dense(self._action_size, activation='softmax')(dense2)
+        # dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
+        # probs = Dense(self._action_size, activation='softmax')(dense2)
+        
+        probs = Dense(self._action_size, activation='softmax')(dense1)
         values = Dense(1, activation='linear')(dense2)
 
         actor = Model(inputs=[input, delta], outputs=[probs])
