@@ -27,8 +27,8 @@ from tensorflow.python.framework.ops import disable_eager_execution
 
 # TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
-
-    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
+    #messo train best false
+    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=False, base_dir=""):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
@@ -340,7 +340,7 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
         return "dddqn-agent"
 
 
-class ActorCriticAgent(Agent):
+class ACCustomAgent(Agent):
 
     def create(self):
         self.init_params()
@@ -352,9 +352,6 @@ class ActorCriticAgent(Agent):
         self.actor_critic_model = ActorCriticNetwork(n_actions=self._action_size, state_size=self._state_size)
 
         self.actor_critic_model.compile(optimizer=self._optimizer)
-
-    def save(self, filename, overwrite=True):
-        self._model.save(filename, overwrite=overwrite)
 
     def init_params(self):
         self.stats = {
@@ -384,22 +381,6 @@ class ActorCriticAgent(Agent):
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
 
     def act(self, obs):
-        # if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration:
-        #     action = np.random.choice(self._action_size)
-        #     self.stats['eps_counter'] += 1
-        # else:
-        #     state_tensor = tf.convert_to_tensor([obs,], dtype=tf.float32)
-        #     state_tensor = tf.expand_dims(state_tensor, 0)
-        #     _, action_probs = self.actor_critic_model(state_tensor, training=False)
-        #     # action = tf.argmax(action_probs[0]).numpy() #action scelta nelle act precedenti
-        #
-        #     action_probabilities = tfp.distributions.Categorical(probs=action_probs)
-        #     action = action_probabilities.sample()
-        #     log_prob = action_probabilities.log_prob(action)
-        #     action = action.numpy()[0]
-        #
-        # self.action = action
-        # return action
         state = tf.convert_to_tensor([obs])
         _, probs = self.actor_critic_model(state)
 
@@ -423,7 +404,7 @@ class ActorCriticAgent(Agent):
 
     def train(self):
         # Get samples from replay buffer
-        state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.sample()
+        state_sample, action_sample, rewards_sample, state_next_sample, done_sample = self._memory.get_last()
         state = tf.convert_to_tensor([state_sample], dtype=tf.float32)
         state_ = tf.convert_to_tensor([state_next_sample], dtype=tf.float32)
         reward = tf.convert_to_tensor(rewards_sample, dtype=tf.float32)  # not fed to NN
@@ -444,7 +425,7 @@ class ActorCriticAgent(Agent):
             # updated_q_values = updated_q_values * (1 - done_sample) - done_sample
             # delta = reward + self.gamma*state_value_*(1-int(done)) - state_value
 
-            delta = reward + self._gamma * state_value_ * (1 - done_sample) - state_value
+            delta = reward + self._gamma * state_value_ * (1 - int(done_sample)) - state_value
             actor_loss = -log_prob * delta
             critic_loss = delta ** 2
             total_loss = actor_loss + critic_loss
@@ -452,9 +433,6 @@ class ActorCriticAgent(Agent):
         gradient = tape.gradient(total_loss, self.actor_critic_model.trainable_variables)
         self.actor_critic_model.optimizer.apply_gradients(zip(
             gradient, self.actor_critic_model.trainable_variables))
-
-    def save(self, filename, overwrite=False):
-        self.actor_critic_model.save(filename, overwrite=overwrite)
 
     def load(self, filename):
         self.init_params()
@@ -466,14 +444,11 @@ class ActorCriticAgent(Agent):
 
         self.actor_critic_model = keras.models.load_model(filename)
 
-        self.critic_grads = tf.gradients(self.actor_critic_model.output, self.critic_action_input)
-
-        # # Initialize for later gradient calculations
-
-    # self.sess.run(tf.initialize_all_variables())
+    def save(self, filename, overwrite=True):
+        self.actor_critic_model.save(filename, overwrite=overwrite)
 
     def __str__(self):
-        return "actorcritic-agent"
+        return "actorcriticCustom-agent"
 
 class ACAgent(Agent):
     def create(self):
@@ -530,9 +505,21 @@ class ACAgent(Agent):
         return actor, critic, policy
 
     def act(self, obs):
+        # AC choose action
         state = obs[np.newaxis, :]
         probabilities = self._policy.predict(state)[0]
         action = np.random.choice(self._action_size, p=probabilities)
+
+        # keras choose action
+        # Sample action from action probability distribution
+        # action = np.random.choice(num_actions, p=np.squeeze(action_probs))
+
+        # DQN choose action
+        # state_tensor = tf.convert_to_tensor(obs)
+        # state_tensor = tf.expand_dims(state_tensor, 0)
+        # action_probs = self._policy(state_tensor, training=False)
+        # # action = tf.argmax(action_probs[0]).numpy()
+        # action = np.random.choice(self._action_size, p=np.squeeze(action_probs))
 
         return action
 
@@ -590,3 +577,127 @@ class ACAgent(Agent):
     def episode_end(self):
         # Decay probability of taking random action
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+
+class ACKerasAgent(Agent):
+    def create(self):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._action_probs_history = []
+        self._critic_value_history = []
+        self._rewards_history = []
+        self._running_reward = 0
+
+        self._eps_keras = np.finfo(np.float32).eps.item()  # Smallest number such that 1.0 + eps != 1.0
+
+        self._model = self.build_network()
+
+    def build_network(self):
+        inputs = layers.Input(shape=(self._state_size,))
+        common = layers.Dense(128, activation="relu")(inputs)
+        action = layers.Dense(self._action_size, activation="softmax")(common)
+        critic = layers.Dense(1)(common)
+
+        model = keras.Model(inputs=inputs, outputs=[action, critic])
+        return model
+
+    def init_params(self):
+        self.stats = {
+            "eps_val": self._params['exp_start'],
+            "eps_counter": 0,
+            "loss": None
+        }
+
+        self._eps_end = self._params['exp_end']
+        self._eps_decay = self._params['exp_decay']
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every']
+        self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
+        self._gamma = self._params['gamma']
+        self._buffer_min_size = self._params['batch_size']
+        self._hidden_sizes = self._params['hidden_sizes']
+
+    def act(self, obs):
+        state = tf.convert_to_tensor(obs)
+        state = tf.expand_dims(state, 0)
+
+        # Predict action probabilities and estimated future rewards
+        # from environment state
+        action_probs, critic_value = self._model(state)
+        self._critic_value_history.append(critic_value[0, 0])
+
+        # Sample action from action probability distribution
+        if np.any(tf.math.is_nan(action_probs)):
+            a = 1
+        action = np.random.choice(self._action_size, p=np.squeeze(action_probs))
+        self._action_probs_history.append(tf.math.log(action_probs[0, action]))
+
+        return action
+
+    def step(self, obs, action, reward, next_obs, done):
+        self._step_count += 1
+
+        # Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
+
+        self.train()
+
+    def train(self):
+        state, action, reward, state_, done = self._memory.get_last()
+        state = tf.convert_to_tensor(state)
+        state = tf.expand_dims(state, 0)
+        state_ = tf.convert_to_tensor(state_)
+        state_ = tf.expand_dims(state_, 0)
+        reward = tf.convert_to_tensor(reward, dtype=tf.float32)  # not fed to NN
+        with tf.GradientTape(persistent=True) as tape:
+            probs, state_value = self._model(state)
+            _, state_value_ = self._model(state_)
+            state_value = tf.squeeze(state_value)
+            state_value_ = tf.squeeze(state_value_)
+
+            action_probs = tfp.distributions.Categorical(probs=probs)
+            log_prob = action_probs.log_prob(action)
+
+            delta = reward + self._gamma * state_value_ * (1 - int(done)) - state_value
+            actor_loss = -log_prob * delta
+            critic_loss = delta ** 2
+            total_loss = actor_loss + critic_loss
+
+        gradient = tape.gradient(total_loss, self._model.trainable_variables)
+        if np.any(tf.math.is_nan(total_loss)):
+             a = 1
+        self.g = gradient
+        self._optimizer.apply_gradients(zip(gradient, self._model.trainable_variables))
+
+    def save(self, filename, overwrite=False):
+        self._model.save(filename, overwrite=overwrite)
+
+    def load(self, filename):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._model = keras.models.load_model(filename)
+
+    def __str__(self):
+        return "acKeras-agent"
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+
+
