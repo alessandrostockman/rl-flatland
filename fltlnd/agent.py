@@ -5,6 +5,7 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow_probability as tfp
 
 import pickle
 import time
@@ -28,7 +29,7 @@ from tensorflow.python.framework.ops import disable_eager_execution
 # TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
     #messo train best false
-    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=False, base_dir=""):
+    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
@@ -448,7 +449,10 @@ class ACCustomAgent(Agent):
         self.actor_critic_model.save(filename, overwrite=overwrite)
 
     def __str__(self):
-        return "actorcriticCustom-agent"
+        return "ACCustom-agent"
+
+    def step_start(self):
+        pass
 
 class ACAgent(Agent):
     def create(self):
