@@ -8,6 +8,7 @@ from tensorflow import keras
 import tensorflow_probability as tfp
 
 import pickle
+import time
 
 # added for DDDQN
 from tensorflow.keras import layers
@@ -470,7 +471,6 @@ class AltDDDQNAgent(Agent):
     def episode_start(self):
         self.stats['eps_counter'] = 0
 
-
 class ACAgent(Agent):
     def create(self):
         self.init_params()
@@ -486,7 +486,11 @@ class ACAgent(Agent):
         self.stats = {
             "eps_val": self._params['exp_start'],
             "eps_counter": 0,
-            "loss": None
+            "loss": None,
+            "time_train": None,
+            "time_fit_actor": None,
+            "time_fit_critic": None,
+            "time_act": None
         }
 
         self._eps_end = self._params['exp_end']
@@ -524,10 +528,12 @@ class ACAgent(Agent):
         return actor, critic, policy
 
     def act(self, obs):
+        start_act = time.time()
         state = obs[np.newaxis, :]
         probabilities = self._policy.predict(state)[0]
         action = np.random.choice(self._action_size, p=probabilities)
 
+        self.stats['time_act'] += time.time() - start_act
         return action
 
     def step(self, obs, action, reward, next_obs, done):
@@ -539,6 +545,7 @@ class ACAgent(Agent):
         self.train()
 
     def train(self):
+        train_start = time.time()
         state, action, reward, state_, done = self._memory.get_last()
         state = state[np.newaxis, :]
         state_ = state_[np.newaxis, :]
@@ -551,13 +558,20 @@ class ACAgent(Agent):
         actions = np.zeros([1, self._action_size])
         actions[np.arange(1), action] = 1
 
+        fit_start = time.time()
         self._actor.fit([state, delta], actions, verbose=0)
+        self.stats['time_fit_actor'] += time.time() - fit_start
 
+        fit_start = time.time()
         self._critic.fit(state, target, verbose=0)
+        self.stats['time_fit_critic'] += time.time() - fit_start
+
+        self.stats['time_train'] += time.time() - train_start
 
     def save(self, filename, overwrite=False):
-        self._actor.save(filename, overwrite=overwrite)
-        # TODO save critic e policy
+        self._actor.save(os.path.join(filename, "actor"), overwrite=overwrite)
+        self._critic.save(os.path.join(filename, "ctitic"), overwrite=overwrite)
+        self._policy.save(os.path.join(filename, "policy"), overwrite=overwrite)
 
     def load(self, filename):
         self.init_params()
@@ -567,14 +581,19 @@ class ACAgent(Agent):
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
-        self._actor = keras.models.load_model(filename)
-        # TODO load critic and model
+        self._actor = keras.models.load_model(os.path.join(filename, "actor"))
+        self._critic = keras.models.load_model(os.path.join(filename, "critic"))
+        self._policy = keras.models.load_model(os.path.join(filename, "policy"))
 
     def __str__(self):
         return "ac-agent"
 
     def episode_start(self):
         self.stats['eps_counter'] = 0
+        self.stats['time_act'] = 0
+        self.stats['time_train'] = 0
+        self.stats['time_fit_actor'] = 0
+        self.stats['time_fit_critic'] = 0
 
     def episode_end(self):
         # Decay probability of taking random action
