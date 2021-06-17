@@ -165,16 +165,14 @@ class WandBLogger(Logger):
         log_dict = {}
         for attr, val in pack.items():
             if val is not None:
-                
-                with tf.summary.create_file_writer(self.get_run_dir()).as_default():
-                    if "val" in self._attributes[attr]:
-                        key = attr + "_val"
-                    if "avg" in self._attributes[attr]:
-                        self._windows[attr].append(val)
-                        key = attr + "_avg"
-                        val = np.mean(self._windows[attr])
+                if "val" in self._attributes[attr]:
+                    key = attr + "_val"
+                if "avg" in self._attributes[attr]:
+                    self._windows[attr].append(val)
+                    key = attr + "_avg"
+                    val = np.mean(self._windows[attr])
                     
-                    log_dict[key] = val
+                log_dict[key] = val
         wandb.log(log_dict)
 
     def _init_hp(self):
