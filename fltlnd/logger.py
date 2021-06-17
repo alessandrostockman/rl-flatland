@@ -174,7 +174,7 @@ class WandBLogger(Logger):
                     
                 log_dict[key] = val
 
-        if type == "episode":
+        if type == "epsd":
             log_dict["episode"] = idx
         wandb.log(log_dict)
 
