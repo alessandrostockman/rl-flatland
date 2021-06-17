@@ -466,11 +466,6 @@ class ActorCriticAgent(Agent):
     def __str__(self):
         return "actorcritic-agent"
 
-
-class AltDDDQNAgent(Agent):
-    def episode_start(self):
-        self.stats['eps_counter'] = 0
-
 class ACAgent(Agent):
     def create(self):
         self.init_params()
