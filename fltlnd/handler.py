@@ -92,6 +92,8 @@ class ExcHandler:
                 # Run episode 
                 for step in range(self._max_steps - 1):
                     count_steps += 1
+
+                    act_time = time.time()
                     for agent in self._env_handler.get_agents_handle():
                         if info['action_required'][agent]:
                             # If an action is required, we want to store the obs at that step as well as the action
@@ -102,11 +104,14 @@ class ExcHandler:
                             update_values = False
                             action = 0
                         action_dict.update({agent: action})
+                    act_time = time.time() - act_time
 
                     # Environment step
+                    
                     next_obs, all_rewards, done, info = self._env_handler.step(action_dict)
 
                     # Update replay buffer and train agent
+                    train_time = time.time()
                     for agent in self._env_handler.get_agents_handle():
                         # Only update the values when we are done or when an action was taken and thus relevant information is present
                         if self._training and (update_values or done[agent]):
@@ -125,7 +130,28 @@ class ExcHandler:
 
                         score += all_rewards[agent]
                     
+                    train_time = time.time() - train_time
                     deadlocks += sum(info['deadlocks'].values())
+
+                    log_data = {
+                        "loss": self._policy.stats['loss'],
+                        "act_time": act_time,
+                        "train_time": train_time
+                    }
+
+                    if 'time_act' in self._policy.stats:
+                        log_data['time_act'] = self._policy.stats['time_act'] / self._env_handler.env.get_num_agents()
+
+                    if 'time_train' in self._policy.stats:
+                        log_data['time_train'] = self._policy.stats['time_train'] / self._env_handler.env.get_num_agents()
+
+                    if 'time_fit_actor' in self._policy.stats:
+                        log_data['time_fit_actor'] = self._policy.stats['time_fit_actor'] / self._env_handler.env.get_num_agents()
+
+                    if 'time_fit_critic' in self._policy.stats:
+                        log_data['time_fit_critic'] = self._policy.stats['time_fit_critic'] / self._env_handler.env.get_num_agents()
+
+                    self._logger.log_step(log_data, step)
 
                     if done['__all__']:
                         break
@@ -138,10 +164,12 @@ class ExcHandler:
                     "completions": tasks_finished / max(1, self._env_handler.env.get_num_agents()),
                     "scores": score / (self._max_steps * self._env_handler.env.get_num_agents()),
                     "steps": count_steps / self._max_steps,
-                    "loss": self._policy.stats['loss'],
-                    "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(), #TODO Check deadlock count
+                    "loss": self._policy.stats['loss'] / np.sum(action_count) if self._policy.stats['loss'] is not None else None,
+                    "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(),
                     "exploration_prob": self._policy.stats['eps_val'],
-                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
+                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count),
+                    "act_time": act_time,
+                    "train_time": train_time
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
