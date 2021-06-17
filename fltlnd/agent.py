@@ -5,7 +5,6 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_probability as tfp
 
 import pickle
 import time
@@ -83,6 +82,10 @@ class Agent(ABC):
         pass
 
     @abstractmethod
+    def step_start(self):
+        pass
+
+    @abstractmethod
     def episode_start(self):
         pass
 
@@ -108,6 +111,9 @@ class RandomAgent(Agent):
 
     def load_best(self):
         self.create()
+
+    def step_start(self):
+        pass
 
     def episode_start(self):
         pass
@@ -145,6 +151,9 @@ class DQNAgent(Agent):
             action_probs = self._model(state_tensor, training=False)
             action = tf.argmax(action_probs[0]).numpy()
         return action
+
+    def step_start(self):
+        pass
 
     def episode_start(self):
         self.stats['eps_counter'] = 0
@@ -481,11 +490,7 @@ class ACAgent(Agent):
         self.stats = {
             "eps_val": self._params['exp_start'],
             "eps_counter": 0,
-            "loss": None,
-            "time_train": None,
-            "time_fit_actor": None,
-            "time_fit_critic": None,
-            "time_act": None
+            "loss": None
         }
 
         self._eps_end = self._params['exp_end']
@@ -520,18 +525,15 @@ class ACAgent(Agent):
         critic = Model(inputs=[input], outputs=[values])
 
         critic.compile(optimizer=Adam(learning_rate=self._learning_rate), loss='mean_squared_error')
-
         policy = Model(inputs=[input], outputs=[probs])
 
         return actor, critic, policy
 
     def act(self, obs):
-        start_act = time.time()
         state = obs[np.newaxis, :]
         probabilities = self._policy.predict(state)[0]
         action = np.random.choice(self._action_size, p=probabilities)
 
-        self.stats['time_act'] += time.time() - start_act
         return action
 
     def step(self, obs, action, reward, next_obs, done):
@@ -543,7 +545,6 @@ class ACAgent(Agent):
         self.train()
 
     def train(self):
-        train_start = time.time()
         state, action, reward, state_, done = self._memory.get_last()
         state = state[np.newaxis, :]
         state_ = state_[np.newaxis, :]
@@ -556,15 +557,9 @@ class ACAgent(Agent):
         actions = np.zeros([1, self._action_size])
         actions[np.arange(1), action] = 1
 
-        fit_start = time.time()
         self._actor.fit([state, delta], actions, verbose=0)
-        self.stats['time_fit_actor'] += time.time() - fit_start
 
-        fit_start = time.time()
         self._critic.fit(state, target, verbose=0)
-        self.stats['time_fit_critic'] += time.time() - fit_start
-
-        self.stats['time_train'] += time.time() - train_start
 
     def save(self, filename, overwrite=False):
         self._actor.save(os.path.join(filename, "actor"), overwrite=overwrite)
@@ -586,12 +581,11 @@ class ACAgent(Agent):
     def __str__(self):
         return "ac-agent"
 
+    def step_start(self):
+        pass
+
     def episode_start(self):
         self.stats['eps_counter'] = 0
-        self.stats['time_act'] = 0
-        self.stats['time_train'] = 0
-        self.stats['time_fit_actor'] = 0
-        self.stats['time_fit_critic'] = 0
 
     def episode_end(self):
         # Decay probability of taking random action

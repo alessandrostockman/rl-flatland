@@ -135,22 +135,10 @@ class ExcHandler:
 
                     log_data = {
                         "loss": self._policy.stats['loss'],
-                        "act_time": act_time,
-                        "train_time": train_time
+                        "time_act": act_time,
+                        "time_train": train_time
                     }
-
-                    if 'time_act' in self._policy.stats:
-                        log_data['time_act'] = self._policy.stats['time_act'] / self._env_handler.env.get_num_agents()
-
-                    if 'time_train' in self._policy.stats:
-                        log_data['time_train'] = self._policy.stats['time_train'] / self._env_handler.env.get_num_agents()
-
-                    if 'time_fit_actor' in self._policy.stats:
-                        log_data['time_fit_actor'] = self._policy.stats['time_fit_actor'] / self._env_handler.env.get_num_agents()
-
-                    if 'time_fit_critic' in self._policy.stats:
-                        log_data['time_fit_critic'] = self._policy.stats['time_fit_critic'] / self._env_handler.env.get_num_agents()
-
+                    
                     self._logger.log_step(log_data, step)
 
                     if done['__all__']:
@@ -167,9 +155,7 @@ class ExcHandler:
                     "loss": self._policy.stats['loss'] / np.sum(action_count) if self._policy.stats['loss'] is not None else None,
                     "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(),
                     "exploration_prob": self._policy.stats['eps_val'],
-                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count),
-                    "act_time": act_time,
-                    "train_time": train_time
+                    "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
                     # "min_steps": min_steps / ?
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
