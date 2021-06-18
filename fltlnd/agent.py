@@ -150,7 +150,7 @@ class DQNAgent(Agent):
             state_tensor = tf.convert_to_tensor(obs)
             state_tensor = tf.expand_dims(state_tensor, 0)
             action_probs = self._model(state_tensor, training=False)
-            action = tf.argmax(action_probs[0]).numpy()
+            action = np.argmax(action_probs[0]) #TODO: Ho letto che tf.argmax è molto più lento di np.argmax
         return action
 
     def step_start(self):
