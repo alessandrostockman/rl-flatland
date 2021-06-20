@@ -3,7 +3,7 @@
         "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
-        "agent_class": "DDDQNAgent",
+        "agent_class": "DuelingDQNAgent",
         "log_class": "WandBLogger",
         "memory_class": "ReplayBuffer",
         "noisy_net": true
@@ -27,7 +27,8 @@
         "checkpoint_freq": 100,
         "target_update": 10000,
         "soft_update": true,
-        "env": "t1.l0"
+        "noisy_net": false,
+        "env": "t1.l1"
     },
     "log": {
         "log_dir": "tmp/logs",

@@ -28,17 +28,21 @@ from tensorflow.python.framework.ops import disable_eager_execution
 # TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
     #messo train best false
-    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir=""):
+    def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir="",
+            checkpoint=None):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
         self._exploration = exploration
         self._base_dir = base_dir
 
-        if train_best:
-            self.load_best()
+        if checkpoint is not None:
+            self.load(checkpoint)
         else:
-            self.create()
+            if train_best:
+                self.load_best()
+            else:
+                self.create()
 
         self._memory = memory_class(self._memory_size, self._batch_size)
 
