@@ -5,7 +5,7 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_probability as tfp
+import tensorflow_addons as tfa
 
 import pickle
 import time
@@ -254,8 +254,9 @@ class DQNAgent(Agent):
 
         for hidden_size in self._hidden_sizes:
             if (self.noisy_net):
-                layer = layers.GaussianNoise()
-            layer = layers.Dense(hidden_size, activation="relu")(layer)
+                layer = tfa.layers.NoisyDense(hidden_size, activation='relu')(layer)
+            else:
+                layer = layers.Dense(hidden_size, activation="relu")(layer)
         action = layers.Dense(self._action_size, activation="linear")(layer)
         model = Model(inputs=inputs, outputs=action)
         model.compile(loss='mse', optimizer=self._optimizer, metrics=["mae"])
