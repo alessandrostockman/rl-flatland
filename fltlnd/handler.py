@@ -22,7 +22,7 @@ import fltlnd.logger as logger_classes
 import fltlnd.replay_buffer as memory_classes
 
 class ExcHandler:
-    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str], synclog: bool):
+    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str], synclog: bool, verbose: bool):
         self._sys_params = params['sys'] # System
         self._obs_params = params['obs'] # Observation
         self._trn_params = params['trn'] # Training
@@ -32,6 +32,10 @@ class ExcHandler:
         self._training = training_mode is not TrainingMode.EVAL
         self._tuning = training_mode is TrainingMode.TUNING
         self._train_best = training_mode in [TrainingMode.BEST, TrainingMode.EVAL]
+        self._save_checkpoints = training_mode is not TrainingMode.DEBUG
+        self._verbose = verbose
+
+        self._default_checkpoint = checkpoint
 
         self._obs_class = getattr(obs_classes, self._sys_params['obs_class'])
         self._agent_class = getattr(agent_classes, self._sys_params['agent_class'])
@@ -56,7 +60,8 @@ class ExcHandler:
         for run_id, params in enumerate(self._logger.get_run_params()):
             self._trn_params.update(params)
             self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params,
-            self._memory_class, self._training, self._train_best, self._sys_params['base_dir'])
+                self._memory_class, self._training, self._train_best, self._sys_params['base_dir'], 
+                self._default_checkpoint)
             self._logger.run_start(self._trn_params, str(self._policy))
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
@@ -166,15 +171,16 @@ class ExcHandler:
                     end = "\n"
                     action_count = [1] * self._action_size
 
-                    if self._training:
+                    if self._training and self._save_checkpoints:
                         self._policy.save(os.path.join(self._sys_params['base_dir'], 'tmp', 'checkpoints', str(self._policy) + '-' + str(episode_idx) + '.pth'), overwrite=True)
                         self._policy.save_best()
 
                 else:
                     end = " "
 
-                self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
-                    self._logger.get_window('completions'), action_probs, end)
+                if self._verbose:
+                    self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
+                        self._logger.get_window('completions'), action_probs, end)
 
                 #TODO Evaluation once every tot
 

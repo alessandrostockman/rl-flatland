@@ -7,6 +7,7 @@ class TrainingMode(Enum):
     TUNING = 2
     BEST = 3
     FRESH = 4
+    DEBUG = 5
 
 def max_lt(seq, val):
     """
