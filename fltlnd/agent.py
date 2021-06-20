@@ -9,7 +9,6 @@ import tensorflow_probability as tfp
 
 import pickle
 import time
-
 # added for DDDQN
 from tensorflow.keras import layers
 from glob import glob
@@ -143,14 +142,14 @@ class DQNAgent(Agent):
 
     def act(self, obs):
 
-        if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration:
+        if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration and not(self.noisy_net):
             action = np.random.choice(self._action_size)
             self.stats['eps_counter'] += 1
         else:
             state_tensor = tf.convert_to_tensor(obs)
             state_tensor = tf.expand_dims(state_tensor, 0)
             action_probs = self._model(state_tensor, training=False)
-            action = np.argmax(action_probs[0]) #TODO: Ho letto che tf.argmax è molto più lento di np.argmax
+            action = np.argmax(action_probs[0])
         return action
 
     def step_start(self):
@@ -226,7 +225,7 @@ class DQNAgent(Agent):
             "eps_counter": 0,
             "loss": None
         }
-
+        self.noisy_net = self._params["noisy_net"]
         self._eps_end = self._params['exp_end']
         self._eps_decay = self._params['exp_decay']
         self._memory_size = self._params['memory_size']
@@ -252,7 +251,10 @@ class DQNAgent(Agent):
         inputs = layers.Input(shape=(self._state_size,))
 
         layer = inputs
+
         for hidden_size in self._hidden_sizes:
+            if (self.noisy_net):
+                layer = layers.GaussianNoise()
             layer = layers.Dense(hidden_size, activation="relu")(layer)
         action = layers.Dense(self._action_size, activation="linear")(layer)
         model = Model(inputs=inputs, outputs=action)
