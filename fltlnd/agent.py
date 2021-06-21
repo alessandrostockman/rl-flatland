@@ -5,6 +5,7 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
+from keras.models import Model, model_from_json, load_model
 import tensorflow_addons as tfa
 
 import pickle
@@ -23,13 +24,13 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework.ops import disable_eager_execution
 
 
-# disable_eager_execution()  # Disable Eager, IMPORTANT!
+disable_eager_execution()  # Disable Eager, IMPORTANT!
 
 # TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
-    #messo train best false
+    # messo train best false
     def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir="",
-            checkpoint=None):
+                 checkpoint=None):
         self._state_size = state_size
         self._action_size = action_size
         self._params = params
@@ -146,7 +147,7 @@ class DQNAgent(Agent):
 
     def act(self, obs):
 
-        if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration and not(self.noisy_net):
+        if self.stats['eps_val'] > np.random.rand(1)[0] and self._exploration and not (self.noisy_net):
             action = np.random.choice(self._action_size)
             self.stats['eps_counter'] += 1
         else:
@@ -347,6 +348,7 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
     def __str__(self):
         return "dddqn-agent"
 
+
 class ACCustomAgent(Agent):
 
     def create(self):
@@ -393,6 +395,8 @@ class ACCustomAgent(Agent):
 
         action_probabilities = tfp.distributions.Categorical(probs=probs)
         action = action_probabilities.sample()
+        if action == 5:
+            a = 1
         log_prob = action_probabilities.log_prob(action)
         self.action = action
 
@@ -404,10 +408,7 @@ class ACCustomAgent(Agent):
         # Save experience in replay memory
         self._memory.add(obs, action, reward, next_obs, done)
 
-        # If enough samples are available in memory, get random subset and learn
-        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
-                self._memory) > self._batch_size:
-            self.train()
+        self.train()
 
     def train(self):
         # Get samples from replay buffer
@@ -460,6 +461,7 @@ class ACCustomAgent(Agent):
     def step_start(self):
         pass
 
+
 class ACAgent(Agent):
     def create(self):
         self.init_params()
@@ -499,7 +501,7 @@ class ACAgent(Agent):
         dense1 = Dense(self._fc1_dims, activation='relu')(input)
         # dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
         # probs = Dense(self._action_size, activation='softmax')(dense2)
-        
+
         probs = Dense(self._action_size, activation='softmax')(dense1)
         values = Dense(1, activation='linear')(dense1)
 
@@ -590,6 +592,9 @@ class ACAgent(Agent):
 
 
 class ACKerasAgent(Agent):
+    def step_start(self):
+        pass
+
     def create(self):
         self.init_params()
 
@@ -682,7 +687,7 @@ class ACKerasAgent(Agent):
 
         gradient = tape.gradient(total_loss, self._model.trainable_variables)
         if np.any(tf.math.is_nan(total_loss)):
-             a = 1
+            a = 1
         self.g = gradient
         self._optimizer.apply_gradients(zip(gradient, self._model.trainable_variables))
 
@@ -708,6 +713,215 @@ class ACKerasAgent(Agent):
     def episode_end(self):
         # Decay probability of taking random action
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+
+class PPOAgent(Agent):
+    def init_params(self):
+        self.stats = {
+            "eps_val": self._params['exp_start'],
+            "eps_counter": 0,
+            "loss": None
+        }
+        self.noisy_net = self._params["noisy_net"]
+        self._eps_end = self._params['exp_end']
+        self._eps_decay = self._params['exp_decay']
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every']
+        self._learning_rate = self._params['learning_rate']
+        self._tau = self._params['tau']
+        self._gamma = self._params['gamma']
+        self._buffer_min_size = self._params['batch_size']
+        self._hidden_sizes = self._params['hidden_sizes']
+
+        # specific actor critic PPO
+        self._actor_learnig_rate = self._learning_rate
+        self._critic_learning_rate = self._learning_rate
+        self._clipping_loss_ratio = 0.1
+        self._entropy_loss_ratio = 0.2
+        self._positive_reward = False
+        self._target_update_alpha = 0.9
+
+    def create(self):
+        self.init_params()
+
+        self._step_count = 0
+
+        self.actor_network = self._build_actor_network()
+        self.actor_old_network = self.build_network_from_copy(self.actor_network)
+
+        self.critic_network = self._build_critic_network()
+
+        self.dummy_advantage = np.zeros((1, 1))
+        self.dummy_old_prediction = np.zeros((1, self._action_size))
+
+    def _build_actor_network(self):
+        state = Input(shape=(self._state_size,), name="state")
+
+        advantage = Input(shape=(1,), name="Advantage")
+        old_prediction = Input(shape=(self._action_size,), name="Old_Prediction")
+
+        shared_hidden = self._shared_network_structure(state)
+        action_dim = self._action_size
+
+        policy = Dense(action_dim, activation="softmax", name="actor_output_layer")(shared_hidden)
+
+        actor_network = Model(inputs=[state, advantage, old_prediction], outputs=policy)
+
+        actor_network.compile(optimizer=Adam(learning_rate=self._actor_learnig_rate),
+                              loss=self.proximal_policy_optimization_loss(
+                                  advantage=advantage, old_prediction=old_prediction
+                              ))
+
+        #TODO: sleep??
+        time.sleep(1.0)
+        return actor_network
+
+    def _build_critic_network(self):
+        state = Input(shape=(self._state_size,), name="state")
+        shared_hidden = self._shared_network_structure(state)
+
+        if self._positive_reward:
+            q = Dense(1, activation="relu", name="critic_output_layer")(shared_hidden)
+        else:
+            q = Dense(1, name="critic_output_layer")(shared_hidden)
+
+        critic_network = Model(inputs=state, outputs=q)
+
+        critic_network.compile(optimizer=Adam(learning_rate=self._critic_learning_rate),
+                               loss="mean_squared_error")
+        #TODO: sleep
+        time.sleep(1.0)
+        return critic_network
+
+    def build_network_from_copy(self, actor_network):
+        network_structure = actor_network.to_json()
+        network_weights = actor_network.get_weights()
+        network = keras.models.model_from_json(network_structure)
+        network.set_weights(network_weights)
+        network.compile(optimizer=Adam(learning_rate=self._actor_learnig_rate), loss="mse")
+        return network
+
+    def _shared_network_structure(self, state_features):
+        dense_d = 32
+        hidden1 = Dense(dense_d, activation="relu", name="hidden_shared_1")(state_features)
+        hidden2 = Dense(dense_d, activation="relu", name="hidden_shared_2")(hidden1)
+        return hidden2
+
+    def proximal_policy_optimization_loss(self, advantage, old_prediction):
+        loss_clipping = self._clipping_loss_ratio
+        entropy_loss = self._entropy_loss_ratio
+
+        def loss(y_true, y_pred):
+            prob = y_true * y_pred
+            old_prob = y_true * old_prediction
+            r = prob / (old_prob + 1e-10)
+            return -K.mean(K.minimum(r * advantage, K.clip(r, min_value=1 - loss_clipping,
+                                                           max_value=1 + loss_clipping) * advantage) + entropy_loss * (
+                                   prob * K.log(prob + 1e-10)))
+
+        return loss
+
+    def act(self, obs):
+        assert isinstance(obs, np.ndarray), "state must be numpy.ndarry"
+
+        state = np.reshape(obs, [-1, self._state_size])
+        prob = self.actor_network.predict_on_batch([state, self.dummy_advantage, self.dummy_old_prediction]).flatten()
+        action = np.random.choice(self._action_size, p=prob)
+        return action
+
+    def step(self, obs, action, reward, next_obs, done):
+        self._step_count += 1
+
+        # Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
+
+        # If enough samples are available in memory, get random subset and learn
+        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
+                self._memory) > self._batch_size:
+            self.train()
+
+    def get_v(self, s):
+        s = np.reshape(s, (-1, self._state_size))
+        v = self.critic_network.predict_on_batch(s)
+        return v
+
+    def train(self):
+        n = self._batch_size
+        discounted_r = []
+
+        last_state, last_action, last_reward, last_state_, last_done = self._memory.get_last()
+        batch_state, batch_action, batch_reward, batch_state_, batch_done = self._memory.sample()
+        if last_done:
+            v = 0
+        else:
+            v = self.get_v(last_state_)
+        for r in batch_reward[::-1]:
+            v = r + self._gamma * v
+            discounted_r.append(v)
+        discounted_r.reverse()
+
+        batch_s, batch_a, batch_discounted_r = np.vstack(batch_state), \
+                                               np.vstack(batch_action), \
+                                               np.vstack(discounted_r)
+
+        batch_v = self.get_v(batch_s)
+        batch_advantage = batch_discounted_r - batch_v
+        batch_old_prediction = self.get_old_prediction(batch_s, batch_advantage)
+
+        batch_a_final = np.zeros(shape=(len(batch_a), self._action_size))
+        batch_a_final[:, batch_a.flatten()] = 1
+        # print(batch_s.shape, batch_advantage.shape, batch_old_prediction.shape, batch_a_final.shape)
+        self.actor_network.fit(x=[batch_s, batch_advantage, batch_old_prediction], y=batch_a_final, verbose=0)
+        self.critic_network.fit(x=batch_s, y=batch_discounted_r, epochs=2, verbose=0)
+        #self._memory.clear()
+        self.update_target_network()
+
+    def get_old_prediction(self, batch_s, batch_advantage):
+        batch_s = np.reshape(batch_s, (-1, self._state_size))
+        #batch_advantage = np.reshape(batch_advantage, (-1, ))
+        dummy_batch_prediction = np.zeros((32, self._action_size))
+
+        return self.actor_old_network.predict_on_batch([batch_s, batch_advantage, dummy_batch_prediction])
+
+    def update_target_network(self):
+        alpha = self._target_update_alpha
+        self.actor_old_network.set_weights(alpha * np.array(self.actor_network.get_weights())
+                                           + (1 - alpha) * np.array(self.actor_old_network.get_weights()))
+
+    def save(self, filename, overwrite=False):
+        self.actor_network.save("%s_actor_network.h5" % filename, overwrite=overwrite)
+        self.critic_network.save("%s_critic_network.h5" % filename, overwrite=overwrite)
+
+    def load(self, filename):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = keras.losses.Huber()
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self.actor_network = keras.models.load_model("%s_actor_network.h5" % filename)
+        self.critic_network = keras.models.load_model("%s_critic_network.h5" % filename)
+
+    def step_start(self):
+        pass
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+    def __str__(self):
+        return "ppo-agent"
+
+
+
+
+
+
 
 
 
