@@ -347,7 +347,6 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
     def __str__(self):
         return "dddqn-agent"
 
-
 class ACCustomAgent(Agent):
 
     def create(self):
