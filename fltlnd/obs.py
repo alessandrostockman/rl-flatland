@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from flatland.envs.observations import TreeObsForRailEnv
+from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 class Observation(ABC):
@@ -24,7 +25,7 @@ class Observation(ABC):
 
 class TreeObs(Observation):
     def create(self):
-        self.builder = TreeObsForRailEnv(max_depth=self.parameters['tree_depth'])
+        self.builder = TreeObsForRailEnv(max_depth=self.parameters['tree_depth'], predictor=ShortestPathPredictorForRailEnv(max_depth=self.parameters['tree_depth']))
 
     def get_state_size(self):
         # Calculate the state size given the depth of the tree observation and the number of features
