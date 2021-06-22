@@ -20,9 +20,8 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework.ops import disable_eager_execution
 
 
-# TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
-    # messo train best false
+
     def __init__(self, state_size, action_size, params, memory_class, exploration=True, train_best=True, base_dir="",
                  checkpoint=None):
         self._state_size = state_size
@@ -31,9 +30,13 @@ class Agent(ABC):
         self._exploration = exploration
         self._base_dir = base_dir
 
+        self._step_count = 0
+
         if checkpoint is not None:
             self.load(checkpoint)
         else:
+            self.init_params()
+
             if train_best:
                 self.load_best()
             else:
@@ -77,10 +80,6 @@ class Agent(ABC):
         self.save(os.path.join(self._base_dir, 'checkpoints', str(self)))
 
     @abstractmethod
-    def __str__(self):
-        pass
-
-    @abstractmethod
     def step_start(self):
         pass
 
@@ -90,6 +89,10 @@ class Agent(ABC):
 
     @abstractmethod
     def episode_end(self):
+        pass
+
+    @abstractmethod
+    def __str__(self):
         pass
 
 
@@ -136,8 +139,18 @@ class RandomAgent(Agent):
     def __str__(self):
         return "random-agent"
 
+class NNAgent(Agent):
 
-class DQNAgent(Agent):
+    def init_params(self):
+        self._memory_size = self._params['memory_size']
+        self._batch_size = self._params['batch_size']
+        self._update_every = self._params['update_every'] #TODO Common?
+        self._learning_rate = self._params['learning_rate']
+        self._gamma = self._params['gamma']
+        self._buffer_min_size = self._params['batch_size']
+        self._hidden_sizes = self._params['hidden_sizes']
+
+class DQNAgent(NNAgent):
 
     def act(self, obs):
 
@@ -150,16 +163,6 @@ class DQNAgent(Agent):
             action_probs = self._model.predict_on_batch(state_tensor)
             action = np.argmax(action_probs[0])
         return action
-
-    def step_start(self):
-        pass
-
-    def episode_start(self):
-        self.stats['eps_counter'] = 0
-
-    def episode_end(self):
-        # Decay probability of taking random action
-        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
 
     def step(self, obs, action, reward, next_obs, done):
         self._step_count += 1
@@ -205,46 +208,31 @@ class DQNAgent(Agent):
         self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
         self._memory.update(loss)
 
-    def load(self, filename):
-        self.init_params()
-
-        self._step_count = 0
-
-        self._loss = keras.losses.Huber()
-        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
-
-        self._model = keras.models.load_model(filename)
-
     def save(self, filename, overwrite=True):
         self._model.save(filename, overwrite=overwrite)
 
+    def load(self, filename):
+        self._model = keras.models.load_model(filename)
+
+    def create(self):        
+        self._model = self.build_network()
+
     def init_params(self):
+        super().init_params()
+
         self.stats = {
             "eps_val": self._params['exp_start'],
             "eps_counter": 0,
             "loss": None
         }
+
         self.noisy_net = self._params["noisy_net"]
         self._eps_end = self._params['exp_end']
         self._eps_decay = self._params['exp_decay']
-        self._memory_size = self._params['memory_size']
-        self._batch_size = self._params['batch_size']
-        self._update_every = self._params['update_every']
-        self._learning_rate = self._params['learning_rate']
         self._tau = self._params['tau']
-        self._gamma = self._params['gamma']
-        self._buffer_min_size = self._params['batch_size']
-        self._hidden_sizes = self._params['hidden_sizes']
-
-    def create(self):
-        self.init_params()
-
-        self._step_count = 0
 
         self._loss = keras.losses.Huber()
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
-
-        self._model = self.build_network()
 
     def build_network(self):
         inputs = layers.Input(shape=(self._state_size,))
@@ -261,6 +249,16 @@ class DQNAgent(Agent):
         model.compile(loss='mse', optimizer=self._optimizer, metrics=["mae"])
         return model
 
+    def step_start(self):
+        pass
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
     def _get_future_rewards(self, state_next_sample):
         return self._model.predict_on_batch(state_next_sample)
 
@@ -269,26 +267,6 @@ class DQNAgent(Agent):
 
 
 class DoubleDQNAgent(DQNAgent):
-
-    def load(self, filename):
-        super().load(filename)
-        self.create_target()
-
-    def create(self):
-        super().create()
-        self.create_target()
-
-    def init_params(self):
-        super().init_params()
-
-        self._tau = self._params['tau']
-        self._target_update = self._params['target_update']
-        self._soft_update = self._params['soft_update']
-
-    def create_target(self):
-        self._model_target = keras.models.clone_model(self._model)
-        self._model_target.build((self._state_size,))
-        self._model_target.set_weights(self._model.get_weights())
 
     def step(self, obs, action, reward, next_obs, done):
         super().step(obs, action, reward, next_obs, done)
@@ -302,6 +280,26 @@ class DoubleDQNAgent(DQNAgent):
                     target_weights[i] = self._tau * weights[i] + (1 - self._tau) * target_weights[i]
 
             self._model_target.set_weights(target_weights)
+
+    def load(self, filename):
+        super().load(filename)
+        self._create_target()
+
+    def create(self):
+        super().create()
+        self._create_target()
+
+    def init_params(self):
+        super().init_params()
+
+        self._tau = self._params['tau']
+        self._target_update = self._params['target_update']
+        self._soft_update = self._params['soft_update']
+
+    def _create_target(self):
+        self._model_target = keras.models.clone_model(self._model)
+        self._model_target.build((self._state_size,))
+        self._model_target.set_weights(self._model.get_weights())
 
     def _get_future_rewards(self, state_next_sample):
         return self._model_target.predict_on_batch(state_next_sample)
@@ -318,7 +316,7 @@ class DuelingDQNAgent(DQNAgent):
         X_layer = inputs
         for hidden_size in self._hidden_sizes:
             X_layer = layers.Dense(hidden_size, activation="relu")(X_layer)
-        # action = layers.Dense(self._action_size, activation="linear")(X_layer)
+        # action = layers.Dense(self._action_size, activation="linear")(X_layer) #TODO Parametrize layer sizes
         X_layer = Dense(1024, activation='relu', kernel_initializer='he_uniform')(X_layer)
         X_layer = Dense(512, activation='relu', kernel_initializer='he_uniform')(X_layer)
 
@@ -341,6 +339,88 @@ class DDDQNAgent(DuelingDQNAgent, DoubleDQNAgent):
 
     def __str__(self):
         return "dddqn-agent"
+
+
+class ActorCriticAgent(NNAgent):
+
+    def act(self, obs):
+        state = obs[np.newaxis, :]
+        probabilities = self._policy.predict(state)[0]
+        action = np.random.choice(self._action_size, p=probabilities)
+        return action
+
+    def step(self, obs, action, reward, next_obs, done):
+        pass
+
+    def train(self):
+        pass
+
+    def load(self, filename):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._loss = None #TODO custom
+        self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._model = keras.models.load_model(filename)
+
+    def save(self, filename, overwrite=True):
+        self._actor_model.save(os.path.join(filename, 'actor'), overwrite=overwrite)
+        self._critic_model.save(os.path.join(filename, 'critic'), overwrite=overwrite)
+
+    def init_params(self):
+        super().init_params()
+
+        self.stats = {
+            "loss": None
+        }
+
+    def create(self):
+        self.init_params()
+
+        self._step_count = 0
+
+        self._actor_optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+        self._critic_optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
+
+        self._actor_model, self._critic_model, self._policy_model = self.build_network()
+
+    def build_network(self):
+        input = Input(shape=(self._state_size,))
+        delta = Input(shape=[1])
+        dense1 = Dense(self._fc1_dims, activation='relu')(input)
+        # dense2 = Dense(self._fc2_dims, activation='relu')(dense1)
+        # probs = Dense(self._action_size, activation='softmax')(dense2)
+
+        probs = Dense(self._action_size, activation='softmax')(dense1)
+        values = Dense(1, activation='linear')(dense1)
+
+        actor = Model(inputs=[input, delta], outputs=[probs])
+        actor.compile(optimizer=self._actor_optimizer, loss=self._actor_loss) #TODO
+
+        critic = Model(inputs=[input], outputs=[values])
+        critic.compile(optimizer=self._critic_optimizer, loss='mse')
+
+        policy = Model(inputs=[input], outputs=[probs])
+
+        return actor, critic, policy
+
+    def step_start(self):
+        pass
+
+    def episode_start(self):
+        self.stats['eps_counter'] = 0
+
+    def episode_end(self):
+        # Decay probability of taking random action
+        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+
+    def _get_future_rewards(self, state_next_sample): #TODO Serve?
+        return self._model.predict_on_batch(state_next_sample)
+
+    def __str__(self):
+        return "ac-agent"
 
 
 class ACCustomAgent(Agent):
@@ -436,6 +516,9 @@ class ACCustomAgent(Agent):
         self.actor_critic_model.optimizer.apply_gradients(zip(
             gradient, self.actor_critic_model.trainable_variables))
 
+    def save(self, filename, overwrite=True):
+        self.actor_critic_model.save(filename, overwrite=overwrite)
+
     def load(self, filename):
         self.init_params()
 
@@ -445,9 +528,6 @@ class ACCustomAgent(Agent):
         self._optimizer = keras.optimizers.Adam(learning_rate=self._learning_rate, clipnorm=1.0)
 
         self.actor_critic_model = keras.models.load_model(filename)
-
-    def save(self, filename, overwrite=True):
-        self.actor_critic_model.save(filename, overwrite=overwrite)
 
     def __str__(self):
         return "ACCustom-agent"
@@ -709,33 +789,73 @@ class ACKerasAgent(Agent):
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
 
 
-class PPOAgent(Agent):
+class PPOAgent(NNAgent):
     def init_params(self):
+        super().init_params()
+        
         tf.compat.v1.disable_eager_execution()
         self.stats = {
             "eps_val": self._params['exp_start'],
             "eps_counter": 0,
             "loss": None
         }
-        self.noisy_net = self._params["noisy_net"]
-        self._eps_end = self._params['exp_end']
-        self._eps_decay = self._params['exp_decay']
-        self._memory_size = self._params['memory_size']
-        self._batch_size = self._params['batch_size']
-        self._update_every = self._params['update_every']
-        self._learning_rate = self._params['learning_rate']
-        self._tau = self._params['tau']
-        self._gamma = self._params['gamma']
-        self._buffer_min_size = self._params['batch_size']
-        self._hidden_sizes = self._params['hidden_sizes']
 
         # specific actor critic PPO
-        self._actor_learnig_rate = self._learning_rate
-        self._critic_learning_rate = self._learning_rate
+        self._actor_learnig_rate = self._params['learning_rate']
+        self._critic_learning_rate = self._params['learning_rate']
         self._clipping_loss_ratio = 0.1
         self._entropy_loss_ratio = 0.2
         self._positive_reward = False
         self._target_update_alpha = 0.9
+
+    def act(self, obs):
+        prob = self.actor_network.predict_on_batch([obs, self.dummy_advantage, self.dummy_old_prediction]).flatten()
+        action = np.random.choice(self._action_size, p=prob)
+        return action
+
+    def step(self, obs, action, reward, next_obs, done):
+        #TODO actor evaluation in batch ???
+        self._step_count += 1
+
+        # Save experience in replay memory
+        self._memory.add(obs, action, reward, next_obs, done)
+
+        # If enough samples are available in memory, get random subset and learn
+        #TODO Remove if ???
+        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
+                self._memory) > self._batch_size:
+            self.train()
+
+    def train(self):
+        n = self._batch_size
+        discounted_r = []
+
+        last_state, last_action, last_reward, last_state_, last_done = self._memory.get_last()
+        batch_state, batch_action, batch_reward, batch_state_, batch_done = self._memory.sample()
+        if last_done:
+            v = 0
+        else:
+            v = self.get_v(last_state_)
+        for r in batch_reward[::-1]:
+            v = r + self._gamma * v
+            discounted_r.append(v)
+        discounted_r.reverse()
+
+        batch_s, batch_a, batch_discounted_r = np.vstack(batch_state), \
+                                               np.vstack(batch_action), \
+                                               np.vstack(discounted_r)
+
+        batch_v = self.get_v(batch_s)
+        batch_advantage = batch_discounted_r - batch_v
+        batch_old_prediction = self.get_old_prediction(batch_s, batch_advantage)
+
+        batch_a_final = np.zeros(shape=(len(batch_a), self._action_size))
+        batch_a_final[:, batch_a.flatten()] = 1
+        # print(batch_s.shape, batch_advantage.shape, batch_old_prediction.shape, batch_a_final.shape)
+        self.actor_network.fit(x=[batch_s, batch_advantage, batch_old_prediction], y=batch_a_final, verbose=0)
+        self.critic_network.fit(x=batch_s, y=batch_discounted_r, epochs=2, verbose=0)
+        #self._memory.clear()
+        self.update_target_network()
 
     def create(self):
         self.init_params()
@@ -749,6 +869,8 @@ class PPOAgent(Agent):
 
         self.dummy_advantage = np.zeros((1, 1))
         self.dummy_old_prediction = np.zeros((1, self._action_size))
+
+        #TODO Custom loss and optimizer initialization ???
 
     def _build_actor_network(self):
         state = Input(shape=(self._state_size,), name="state")
@@ -812,60 +934,10 @@ class PPOAgent(Agent):
 
         return loss
 
-    def act(self, obs):
-        assert isinstance(obs, np.ndarray), "state must be numpy.ndarry"
-
-        state = np.reshape(obs, [-1, self._state_size])
-        prob = self.actor_network.predict_on_batch([state, self.dummy_advantage, self.dummy_old_prediction]).flatten()
-        action = np.random.choice(self._action_size, p=prob)
-        return action
-
-    def step(self, obs, action, reward, next_obs, done):
-        self._step_count += 1
-
-        # Save experience in replay memory
-        self._memory.add(obs, action, reward, next_obs, done)
-
-        # If enough samples are available in memory, get random subset and learn
-        if self._step_count % self._update_every == 0 and len(self._memory) > self._buffer_min_size and len(
-                self._memory) > self._batch_size:
-            self.train()
-
     def get_v(self, s):
         s = np.reshape(s, (-1, self._state_size))
         v = self.critic_network.predict_on_batch(s)
         return v
-
-    def train(self):
-        n = self._batch_size
-        discounted_r = []
-
-        last_state, last_action, last_reward, last_state_, last_done = self._memory.get_last()
-        batch_state, batch_action, batch_reward, batch_state_, batch_done = self._memory.sample()
-        if last_done:
-            v = 0
-        else:
-            v = self.get_v(last_state_)
-        for r in batch_reward[::-1]:
-            v = r + self._gamma * v
-            discounted_r.append(v)
-        discounted_r.reverse()
-
-        batch_s, batch_a, batch_discounted_r = np.vstack(batch_state), \
-                                               np.vstack(batch_action), \
-                                               np.vstack(discounted_r)
-
-        batch_v = self.get_v(batch_s)
-        batch_advantage = batch_discounted_r - batch_v
-        batch_old_prediction = self.get_old_prediction(batch_s, batch_advantage)
-
-        batch_a_final = np.zeros(shape=(len(batch_a), self._action_size))
-        batch_a_final[:, batch_a.flatten()] = 1
-        # print(batch_s.shape, batch_advantage.shape, batch_old_prediction.shape, batch_a_final.shape)
-        self.actor_network.fit(x=[batch_s, batch_advantage, batch_old_prediction], y=batch_a_final, verbose=0)
-        self.critic_network.fit(x=batch_s, y=batch_discounted_r, epochs=2, verbose=0)
-        #self._memory.clear()
-        self.update_target_network()
 
     def get_old_prediction(self, batch_s, batch_advantage):
         batch_s = np.reshape(batch_s, (-1, self._state_size))
@@ -880,8 +952,8 @@ class PPOAgent(Agent):
                                            + (1 - alpha) * np.array(self.actor_old_network.get_weights()))
 
     def save(self, filename, overwrite=False):
-        self.actor_network.save("%s_actor_network.h5" % filename, overwrite=overwrite)
-        self.critic_network.save("%s_critic_network.h5" % filename, overwrite=overwrite)
+        self._actor_model.save(os.path.join(filename, 'actor'), overwrite=overwrite)
+        self._critic_model.save(os.path.join(filename, 'critic'), overwrite=overwrite)
 
     def load(self, filename):
         self.init_params()
@@ -898,11 +970,10 @@ class PPOAgent(Agent):
         pass
 
     def episode_start(self):
-        self.stats['eps_counter'] = 0
+        pass
 
     def episode_end(self):
-        # Decay probability of taking random action
-        self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
+        pass
 
     def __str__(self):
         return "ppo-agent"
