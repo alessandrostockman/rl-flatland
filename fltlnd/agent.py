@@ -5,14 +5,10 @@ from numpy.core.arrayprint import dtype_short_repr
 from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-from keras.models import Model, model_from_json, load_model
 import tensorflow_addons as tfa
 
-import pickle
-import time
 # added for DDDQN
 from tensorflow.keras import layers
-from glob import glob
 
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Add
@@ -23,8 +19,6 @@ from fltlnd.replay_buffer import ReplayBuffer
 from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework.ops import disable_eager_execution
 
-
-disable_eager_execution()  # Disable Eager, IMPORTANT!
 
 # TODO: veririficare come inserire il blocco PER della gestione della memoria e come costruire i valori d'errore e passarli alla memoria stessa.
 class Agent(ABC):
@@ -153,7 +147,7 @@ class DQNAgent(Agent):
         else:
             state_tensor = tf.convert_to_tensor(obs)
             state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = self._model(state_tensor, training=False)
+            action_probs = self._model.predict_on_batch(state_tensor)
             action = np.argmax(action_probs[0])
         return action
 
@@ -268,7 +262,7 @@ class DQNAgent(Agent):
         return model
 
     def _get_future_rewards(self, state_next_sample):
-        return self._model.predict(state_next_sample)
+        return self._model.predict_on_batch(state_next_sample)
 
     def __str__(self):
         return "dqn-agent"
@@ -310,7 +304,7 @@ class DoubleDQNAgent(DQNAgent):
             self._model_target.set_weights(target_weights)
 
     def _get_future_rewards(self, state_next_sample):
-        return self._model_target.predict(state_next_sample)
+        return self._model_target.predict_on_batch(state_next_sample)
 
     def __str__(self):
         return "double-dqn-agent"
@@ -717,6 +711,7 @@ class ACKerasAgent(Agent):
 
 class PPOAgent(Agent):
     def init_params(self):
+        tf.compat.v1.disable_eager_execution()
         self.stats = {
             "eps_val": self._params['exp_start'],
             "eps_counter": 0,
@@ -773,8 +768,6 @@ class PPOAgent(Agent):
                                   advantage=advantage, old_prediction=old_prediction
                               ))
 
-        #TODO: sleep??
-        time.sleep(1.0)
         return actor_network
 
     def _build_critic_network(self):
@@ -790,15 +783,12 @@ class PPOAgent(Agent):
 
         critic_network.compile(optimizer=Adam(learning_rate=self._critic_learning_rate),
                                loss="mean_squared_error")
-        #TODO: sleep
-        time.sleep(1.0)
         return critic_network
 
     def build_network_from_copy(self, actor_network):
-        network_structure = actor_network.to_json()
-        network_weights = actor_network.get_weights()
-        network = keras.models.model_from_json(network_structure)
-        network.set_weights(network_weights)
+        network = keras.models.clone_model(actor_network)
+        network.build((self._state_size,))
+        network.set_weights(actor_network.get_weights())
         network.compile(optimizer=Adam(learning_rate=self._actor_learnig_rate), loss="mse")
         return network
 
