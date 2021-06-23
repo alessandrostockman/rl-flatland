@@ -20,13 +20,16 @@ import fltlnd.agent as agent_classes
 import fltlnd.obs as obs_classes
 import fltlnd.logger as logger_classes
 import fltlnd.replay_buffer as memory_classes
+import fltlnd.predict as predictor_classes
+
 
 class ExcHandler:
-    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str], synclog: bool, verbose: bool):
-        self._sys_params = params['sys'] # System
-        self._obs_params = params['obs'] # Observation
-        self._trn_params = params['trn'] # Training
-        self._log_params = params['log'] # Policy
+    def __init__(self, params: dict, training_mode: TrainingMode, rendering: bool, checkpoint: Optional[str],
+                 synclog: bool, verbose: bool):
+        self._sys_params = params['sys']  # System
+        self._obs_params = params['obs']  # Observation
+        self._trn_params = params['trn']  # Training
+        self._log_params = params['log']  # Policy
 
         self._rendering = rendering
         self._training = training_mode is not TrainingMode.EVAL
@@ -42,9 +45,16 @@ class ExcHandler:
         self._logger_class = getattr(logger_classes, self._sys_params['log_class'])
         self._memory_class = getattr(memory_classes, self._sys_params['memory_class'])
 
-        self._obs_wrapper = self._obs_class(self._obs_params)
-        self._env_handler = EnvHandler(self._sys_params['base_dir'] + "parameters/environments.json", self._obs_wrapper.builder, 
-            self._rendering)
+        if self._sys_params['predictor_class'] != None:
+            self._predictor_class = getattr(predictor_classes, self._sys_params['predictor_class'])
+            self._predictor = self._predictor_class(self._obs_params)
+        else:
+            self._predictor = None
+
+        self._obs_wrapper = self._obs_class(self._obs_params, self._predictor)
+        self._env_handler = EnvHandler(self._sys_params['base_dir'] + "parameters/environments.json",
+                                       self._obs_wrapper.builder,
+                                       self._rendering)
 
         # The action space of flatland is 5 discrete actions
         self._action_size = 5
@@ -60,8 +70,9 @@ class ExcHandler:
         for run_id, params in enumerate(self._logger.get_run_params()):
             self._trn_params.update(params)
             self._policy = self._agent_class(self._state_size, self._action_size, self._trn_params,
-                self._memory_class, self._training, self._train_best, self._sys_params['base_dir'], 
-                self._default_checkpoint)
+                                             self._memory_class, self._training, self._train_best,
+                                             self._sys_params['base_dir'],
+                                             self._default_checkpoint)
             self._logger.run_start(self._trn_params, str(self._policy))
             self._env_handler.update(self._trn_params['env'], self._sys_params['seed'])
 
@@ -112,7 +123,7 @@ class ExcHandler:
                     act_time = time.time() - act_time
 
                     # Environment step
-                    
+
                     next_obs, all_rewards, done, info = self._env_handler.step(action_dict)
 
                     # Update replay buffer and train agent
@@ -134,7 +145,7 @@ class ExcHandler:
                             agent_obs[agent] = self._obs_wrapper.normalize(next_obs[agent])
 
                         score += all_rewards[agent]
-                    
+
                     train_time = time.time() - train_time
                     deadlocks += sum(info['deadlocks'].values())
 
@@ -143,7 +154,7 @@ class ExcHandler:
                         "time_act": act_time,
                         "time_train": train_time
                     }
-                    
+
                     self._logger.log_step(log_data, step)
 
                     if done['__all__']:
@@ -157,7 +168,8 @@ class ExcHandler:
                     "completions": tasks_finished / max(1, self._env_handler.env.get_num_agents()),
                     "scores": score / (self._max_steps * self._env_handler.env.get_num_agents()),
                     "steps": count_steps / self._max_steps,
-                    "loss": self._policy.stats['loss'] / np.sum(action_count) if self._policy.stats['loss'] is not None else None,
+                    "loss": self._policy.stats['loss'] / np.sum(action_count) if self._policy.stats[
+                                                                                     'loss'] is not None else None,
                     "deadlocks": sum(info['deadlocks'].values()) / self._env_handler.env.get_num_agents(),
                     "exploration_prob": self._policy.stats['eps_val'],
                     "exploration_count": self._policy.stats['eps_counter'] / np.sum(action_count)
@@ -172,21 +184,25 @@ class ExcHandler:
                     action_count = [1] * self._action_size
 
                     if self._training and self._save_checkpoints:
-                        self._policy.save(os.path.join(self._sys_params['base_dir'], 'tmp', 'checkpoints', str(self._policy) + '-' + str(episode_idx) + '.pth'), overwrite=True)
+                        self._policy.save(os.path.join(self._sys_params['base_dir'], 'tmp', 'checkpoints',
+                                                       str(self._policy) + '-' + str(episode_idx) + '.pth'),
+                                          overwrite=True)
                         self._policy.save_best()
 
                 else:
                     end = " "
 
                 if self._verbose:
-                    self._env_handler.print_results(episode_idx, self._logger.get_window('scores'), 
-                        self._logger.get_window('completions'), action_probs, end)
+                    self._env_handler.print_results(episode_idx, self._logger.get_window('scores'),
+                                                    self._logger.get_window('completions'), action_probs, end)
 
-                #TODO Evaluation once every tot
+                # TODO Evaluation once every tot
 
-            self._logger.run_end(params, eval_score / (self._max_steps * self._env_handler.env.get_num_agents()), run_id)
+            self._logger.run_end(params, eval_score / (self._max_steps * self._env_handler.env.get_num_agents()),
+                                 run_id)
 
         return time.time() - start_time
+
 
 class EnvHandler:
     def __init__(self, env_filename, obs_builder, rendering=False):

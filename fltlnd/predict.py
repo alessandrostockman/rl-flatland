@@ -18,8 +18,8 @@ from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 class RandomShortestPastPredictor(PredictionBuilder):
 
-    def __init__(self, max_depth: int = 20):
-        super().__init__(max_depth)
+    def __init__(self, params):
+        super().__init__(params['tree_depth'])
 
     def get(self, handle: int = None):
         """
