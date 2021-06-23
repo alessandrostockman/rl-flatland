@@ -9,9 +9,9 @@ from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 
 class Observation(ABC):
-    def __init__(self, parameters):
+    def __init__(self, parameters, predictor=None):
         self.parameters = parameters
-        self.create()
+        self.create(predictor)
 
     @abstractmethod
     def create(self):
@@ -27,8 +27,8 @@ class Observation(ABC):
 
 
 class TreeObs(Observation):
-    def create(self):
-        self.builder = TreeObsForRailEnv(max_depth=self.parameters['tree_depth'], predictor=RandomShortestPastPredictor(max_depth=self.parameters['tree_depth']))
+    def create(self, predictor):
+        self.builder = TreeObsForRailEnv(max_depth=self.parameters['tree_depth'], predictor=predictor)
 
     def get_state_size(self):
         # Calculate the state size given the depth of the tree observation and the number of features

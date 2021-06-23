@@ -5,7 +5,8 @@
         "obs_class": "TreeObs",
         "agent_class": "DDDQNAgent",
         "log_class": "WandBLogger",
-        "memory_class": "ReplayBuffer"
+        "memory_class": "ReplayBuffer",
+        "predictor_class": null
     },
     "obs": {
         "tree_depth": 2,
