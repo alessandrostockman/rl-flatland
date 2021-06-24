@@ -25,6 +25,10 @@ class Buffer:
         pass
     
     @abstractmethod
+    def reset(self):
+        pass
+    
+    @abstractmethod
     def __len__(self):
         pass
 
@@ -34,11 +38,15 @@ class ReplayBuffer(Buffer):
     
     def __init__(self, buffer_size, batch_size):
         super().__init__(buffer_size, batch_size)
-        self.memory = deque(maxlen=buffer_size)
+        self._batch_size = buffer_size
+        self.memory = deque(maxlen=self._batch_size)
+        self.has_probability = False
 
-    def add(self, state, action, reward, next_state, done):
+    def add(self, state, action, reward, next_state, done, probability=None):
         """Add a new experience to memory."""
-        self.memory.append([state, action, reward, next_state, done])
+        self.memory.append([state, action, reward, next_state, done, probability])
+        if probability is not None:
+            self.has_probability = True
 
     def get_last(self):
         return self.memory.__getitem__(self.memory.__len__()-1)
@@ -49,12 +57,19 @@ class ReplayBuffer(Buffer):
         # sample memory for a minibatch
         batch = random.sample(self.memory, self.batch_size)
         # separate minibatch into elements
-        state, action, reward, next_state, done = [np.squeeze(i) for i in zip(*batch)]
 
-        return state, action, reward, next_state, done
+        state, action, reward, next_state, done, probability = [np.squeeze(i) for i in zip(*batch)]
+
+        if self.has_probability:
+            return state, action, reward, next_state, done, probability
+        else:
+            return state, action, reward, next_state, done
         
     def update(self, error):
         pass
+    
+    def reset(self):
+        self.memory = deque(maxlen=self._batch_size)
 
     def __len__(self):
         """Return the current size of internal memory."""
@@ -73,6 +88,8 @@ class PrioritizedBuffer(Buffer):
         self.alpha = 0.6
         self.beta = 0.4
         self.beta_growth = 0.001
+
+        self._batch_size = batch_size
         self.tree = SumTree(batch_size)
 
     def _get_priority(self, error):
@@ -123,6 +140,9 @@ class PrioritizedBuffer(Buffer):
 
         for idx in self.sample_ids:
             self.tree.update(idx, p)
+    
+    def reset(self):
+        self.tree = SumTree(self._batch_size)
 
     def __len__(self):
         return self._internal_len
