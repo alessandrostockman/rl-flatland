@@ -411,12 +411,10 @@ class PPOAgent(NNAgent):
         self._memory.reset()
 
     def save(self, filename, overwrite=False):
-        self._actor_model.save(os.path.join(filename, 'actor'), overwrite=overwrite)
-        self._critic_model.save(os.path.join(filename, 'critic'), overwrite=overwrite)
+        self._model.save(filename, overwrite=overwrite)
 
     def load(self, filename):
-        self._actor_model = keras.models.load_model(os.path.join(filename, 'actor'))
-        self._critic_model = keras.models.load_model(os.path.join(filename, 'critic'))
+        self._model = keras.models.load_model(filename)
 
     def create(self):
         self._model = self._build_network()
