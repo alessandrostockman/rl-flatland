@@ -271,7 +271,7 @@ class DQNAgent(NNAgent):
 class DoubleDQNAgent(DQNAgent):
 
     def step(self, obs, action, reward, next_obs, done, agent):
-        super().step(obs, action, reward, next_obs, done)
+        super().step(obs, action, reward, next_obs, done, agent)
         if self._step_count % self._target_update == 0 or self._soft_update:
             # update the the target network with new weights
             weights = self._model.get_weights()
