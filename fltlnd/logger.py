@@ -121,12 +121,7 @@ class TensorboardLogger(Logger):
                 self._hparams.append(hp_obj)
             self._combinations = [dict(zip(self._parameter_list, x)) for x in itertools.product(*self._parameter_list.values())]
 
-        self._metric = hp.Metric('scores') #TODO: Check if more metrics are needed
-        # hp.Metric("epoch_accuracy",group="validation",display_name="accuracy (val.)",),
-        # hp.Metric("epoch_loss",group="validation",display_name="loss (val.)",),
-        # hp.Metric("batch_accuracy",group="train",display_name="accuracy (train)",), 
-        # hp.Metric("batch_loss", group="train", display_name="loss (train)",)
-            
+        self._metric = hp.Metric('scores')
 
         with tf.summary.create_file_writer(self.get_hp_dir()).as_default():
             hp.hparams_config(

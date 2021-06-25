@@ -145,7 +145,7 @@ class NNAgent(Agent):
     def init_params(self):
         self._memory_size = self._params['memory_size']
         self._batch_size = self._params['batch_size']
-        self._update_every = self._params['update_every'] #TODO Common?
+        self._update_every = self._params['update_every']
         self._learning_rate = self._params['learning_rate']
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
@@ -441,7 +441,6 @@ class PPOAgent(NNAgent):
         self._target_update_alpha = 0.9
 
         self.surrogate_eps_clip = 0.1
-        self.K_epoch = 10
         self.weight_loss = 0.5
         self.weight_entropy = 0.01
 
