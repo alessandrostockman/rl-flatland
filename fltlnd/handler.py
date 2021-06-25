@@ -5,10 +5,7 @@ import json
 import time
 import random
 from flatland.envs import malfunction_generators as mal_gen
-import matplotlib.pyplot as plt
 import numpy as np
-
-from collections import deque
 
 from flatland.envs.rail_env import RailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
@@ -195,8 +192,6 @@ class ExcHandler:
                 if self._verbose:
                     self._env_handler.print_results(episode_idx, self._logger.get_window('scores'),
                                                     self._logger.get_window('completions'), action_probs, end)
-
-                # TODO Evaluation once every tot
 
             self._logger.run_end(params, eval_score / (self._max_steps * self._env_handler.env.get_num_agents()),
                                  run_id)

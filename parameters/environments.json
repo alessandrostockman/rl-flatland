@@ -1,15 +1,4 @@
 {
-    "r0.s": {
-        "n_agents": 1,
-        "x_dim": 25,
-        "y_dim": 25,
-        "n_cities": 2,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
-        "min_malfunction_interval": 50,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
     "t1.l0": {
         "n_agents": 3,
         "x_dim": 30,
@@ -51,94 +40,6 @@
         "max_rails_between_cities": 4,
         "max_rails_in_city": 3,
         "min_malfunction_interval": 50,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r1.s": {
-        "n_agents": 5,
-        "x_dim": 25,
-        "y_dim": 25,
-        "n_cities": 2,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
-        "min_malfunction_interval": 50,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r1.m": {
-        "n_agents": 50,
-        "x_dim": 20,
-        "y_dim": 35,
-        "n_cities": 3,
-        "max_rails_between_cities": 3,
-        "max_rails_in_city": 2,
-        "min_malfunction_interval": 500,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r1.l": {
-        "n_agents": 80,
-        "x_dim": 40,
-        "y_dim": 60,
-        "n_cities": 9,
-        "max_rails_between_cities": 4,
-        "max_rails_in_city": 2,
-        "min_malfunction_interval": 800,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r1.xl": {
-        "n_agents": 400,
-        "x_dim": 150,
-        "y_dim": 150,
-        "n_cities": 37,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 4,
-        "min_malfunction_interval": 4000,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r2.s": {
-        "n_agents": 18,
-        "x_dim": 29,
-        "y_dim": 29,
-        "n_cities": 3,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
-        "min_malfunction_interval": 2500,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r2.m": {
-        "n_agents": 98,
-        "x_dim": 48,
-        "y_dim": 48,
-        "n_cities": 11,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 2,
-        "min_malfunction_interval": 5000,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r2.l": {
-        "n_agents": 781,
-        "x_dim": 117,
-        "y_dim": 117,
-        "n_cities": 80,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 2,
-        "min_malfunction_interval": 7500,
-        "grid_mode": false,
-        "malfunction_duration": [20, 50]
-    },
-    "r2.xl": {
-        "n_agents": 6256,
-        "x_dim": 314,
-        "y_dim": 314,
-        "n_cities": 627,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 4,
-        "min_malfunction_interval": 10000,
         "grid_mode": false,
         "malfunction_duration": [20, 50]
     }

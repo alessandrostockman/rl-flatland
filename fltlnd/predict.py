@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-
-import random
 import math
 from flatland.envs.rail_trainrun_data_structures import Waypoint
 
@@ -10,12 +7,8 @@ from flatland.core.env_prediction_builder import PredictionBuilder
 from flatland.envs.agent_utils import RailAgentStatus
 from flatland.envs.distance_map import DistanceMap
 from flatland.envs.rail_env import RailEnvActions
-from flatland.envs.rail_env_shortest_paths import get_shortest_paths, get_valid_move_actions_
+from flatland.envs.rail_env_shortest_paths import get_valid_move_actions_
 from flatland.utils.ordered_set import OrderedSet
-
-from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.predictions import ShortestPathPredictorForRailEnv
-from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 
 class StochasticPathPredictor(PredictionBuilder):
@@ -24,30 +17,6 @@ class StochasticPathPredictor(PredictionBuilder):
         super().__init__(params['tree_depth'])
 
     def get(self, handle: int = None):
-        """
-        Called whenever get_many in the observation build is called.
-        Requires distance_map to extract the shortest path.
-        Does not take into account future positions of other agents!
-
-        If there is no shortest path, the agent just stands still and stops moving.
-
-        Parameters
-        ----------
-        handle : int, optional
-            Handle of the agent for which to compute the observation vector.
-
-        Returns
-        -------
-        np.array
-            Returns a dictionary indexed by the agent handle and for each agent a vector of (max_depth + 1)x5 elements:
-            - time_offset
-            - position axis 0
-            - position axis 1
-            - direction
-            - action taken to come here (not implemented yet)
-            The prediction at 0 is the current position, direction etc.
-        """
-
         agents = self.env.agents
         if handle:
             agents = [self.env.agents[handle]]
@@ -116,16 +85,12 @@ class StochasticPathPredictor(PredictionBuilder):
                 prediction[index] = [index, *new_position, new_direction, 0]
                 visited.add((*new_position, new_direction))
 
-            # TODO: very bady side effects for visualization only: hand the dev_pred_dict back instead of setting on env!
             self.env.dev_pred_dict[agent.handle] = visited
             prediction_dict[agent.handle] = prediction
 
         return prediction_dict
 
     def get_weighted_paths(self, distance_map, max_depth=None, agent_handle=None):
-        """
-        Copy of rail_env_shortst_paths.get_shortest_paths
-        """
         paths = dict()
         paths_distance = dict()
 

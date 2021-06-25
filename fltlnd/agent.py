@@ -1,24 +1,16 @@
 from abc import ABC, abstractmethod
 import os
+
 import numpy as np
-from numpy.core.arrayprint import dtype_short_repr
-from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_addons as tfa
-
-import tensorflow_probability as tfp
-
-# added for DDDQN
-from tensorflow.keras import layers
-
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Add
-from tensorflow.keras import backend as K
-
-from fltlnd.actorCriticNetwork import ActorCriticNetwork
-from fltlnd.replay_buffer import ReplayBuffer
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import layers
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Lambda, Add
+from tensorflow.keras import backend as K
+import tensorflow_addons as tfa
+import tensorflow_probability as tfp
 
 class Agent(ABC):
 
@@ -145,7 +137,7 @@ class NNAgent(Agent):
     def init_params(self):
         self._memory_size = self._params['memory_size']
         self._batch_size = self._params['batch_size']
-        self._update_every = self._params['update_every'] #TODO Common?
+        self._update_every = self._params['update_every']
         self._learning_rate = self._params['learning_rate']
         self._gamma = self._params['gamma']
         self._buffer_min_size = self._params['batch_size']
@@ -441,9 +433,8 @@ class PPOAgent(NNAgent):
         self._target_update_alpha = 0.9
 
         self.surrogate_eps_clip = 0.1
-        self.K_epoch = 10
         self.weight_loss = 0.5
-        self.weight_entropy = 0.01
+        self.weight_entropy = 0.1
 
         self._optimizer = Adam(learning_rate=self._learning_rate)
 

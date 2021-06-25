@@ -1,5 +1,7 @@
 from enum import Enum
+
 import numpy as np
+
 from flatland.envs.observations import TreeObsForRailEnv
 
 class TrainingMode(Enum):

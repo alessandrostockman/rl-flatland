@@ -1,10 +1,10 @@
 from abc import abstractclassmethod, abstractmethod
-
-from tensorflow.python.ops.gen_math_ops import batch_mat_mul
-from fltlnd.utils import SumTree
 import random
 from collections import deque
+
 import numpy as np
+
+from fltlnd.utils import SumTree
 
 class Buffer:
 
@@ -94,10 +94,6 @@ class ReplayBuffer(Buffer):
         """Return the current size of internal memory."""
         return len(self.memory)
 
-
-#TODO: il sample restituisce una tupla contenente l'idx ed il sample (state,action...) questa
-#cosa va ad influire il funzionamento dell'agent, in quanto quando facciamo il sample, estraiamo
-#(state,action...) ma nel caso del PER otteniamo la tupla ***vedere DQNAgent***
 class PrioritizedBuffer(Buffer):
     def __init__(self, buffer_size, batch_size):
         super().__init__(buffer_size, batch_size)
