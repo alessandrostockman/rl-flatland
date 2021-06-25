@@ -133,7 +133,7 @@ class ExcHandler:
                         if self._training and (update_values or done[agent]):
                             self._policy.step(
                                 agent_prev_obs[agent], agent_prev_action[agent], agent_prev_rewards[agent],
-                                agent_obs[agent], agent_prev_done[agent]
+                                agent_obs[agent], agent_prev_done[agent], agent
                             )
 
                             agent_prev_obs[agent] = agent_obs[agent].copy()
@@ -177,7 +177,7 @@ class ExcHandler:
                 }, **dict(zip(["act_" + str(i) for i in range(self._action_size)], action_probs))}, episode_idx)
 
                 eval_score = score
-                self._policy.episode_end()
+                self._policy.episode_end(self._env_handler.get_agents_handle())
 
                 if episode_idx % self._trn_params['checkpoint_freq'] == 0:
                     end = "\n"

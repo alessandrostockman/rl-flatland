@@ -23,6 +23,18 @@ class Buffer:
     @abstractmethod
     def update(self, idx, error):
         pass
+
+    @abstractmethod
+    def add_agent_episode(self, agent, action, value, obs, reward, done, policy_logits):
+        pass
+
+    @abstractmethod
+    def retrieve_agent_episodes(self, agent):
+        pass
+
+    @abstractmethod
+    def reset(self):
+        pass
     
     @abstractmethod
     def reset(self):
@@ -68,8 +80,15 @@ class ReplayBuffer(Buffer):
     def update(self, error):
         pass
     
+
+    def add_agent_episode(self, agent, action, value, obs, reward, done, policy_logits):
+        raise NotImplementedError()
+    
+    def retrieve_agent_episodes(self, agent):
+        raise NotImplementedError()
+
     def reset(self):
-        self.memory = deque(maxlen=self._batch_size)
+        raise NotImplementedError()
 
     def __len__(self):
         """Return the current size of internal memory."""
@@ -140,10 +159,45 @@ class PrioritizedBuffer(Buffer):
 
         for idx in self.sample_ids:
             self.tree.update(idx, p)
+
+    def add_agent_episode(self, agent, action, value, obs, reward, done, policy_logits):
+        raise NotImplementedError()
     
+    def retrieve_agent_episodes(self, agent):
+        raise NotImplementedError()
+
     def reset(self):
-        self.tree = SumTree(self._batch_size)
+        raise NotImplementedError()
 
     def __len__(self):
         return self._internal_len
         
+
+class AgentEpisodeBuffer(Buffer):
+
+    def __init__(self, buffer_size, batch_size):
+        self._memory = {}
+
+    def add(self, state, action, reward, next_state, done):
+        raise NotImplementedError()
+
+    def sample(self):
+        raise NotImplementedError()
+
+    def update(self, idx, error):
+        raise NotImplementedError()
+
+    def add_agent_episode(self, agent, action, value, obs, reward, done, policy_logits):
+        agent_mem = self._memory.get(agent, [])
+        agent_mem.append([action, value, obs, reward, done, policy_logits])
+        self._memory[agent] = agent_mem
+    
+    def retrieve_agent_episodes(self, agent):
+        action, value, obs, reward, done, policy_logits = [np.squeeze(i) for i in zip(*self._memory[agent])]
+        return action, value, obs, reward, done, policy_logits
+
+    def reset(self):
+        self._memory = {}
+    
+    def __len__(self):
+        pass

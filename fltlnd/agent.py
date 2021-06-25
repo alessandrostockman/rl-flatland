@@ -57,7 +57,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def step(self, obs, action, reward, next_obs, done):
+    def step(self, obs, action, reward, next_obs, done, agent):
         pass
 
     @abstractmethod
@@ -88,7 +88,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def episode_end(self):
+    def episode_end(self, agents):
         pass
 
     @abstractmethod
@@ -102,7 +102,7 @@ class RandomAgent(Agent):
         self.stats['eps_counter'] += 1
         return np.random.choice(np.arange(self._action_size))
 
-    def step(self, obs, action, reward, next_obs, done):
+    def step(self, obs, action, reward, next_obs, done, agent):
         pass
 
     def save(self, filename, overwrite=False):
@@ -120,7 +120,7 @@ class RandomAgent(Agent):
     def episode_start(self):
         pass
 
-    def episode_end(self):
+    def episode_end(self, agents):
         pass
 
     def create(self):
@@ -166,7 +166,7 @@ class DQNAgent(NNAgent):
             action = np.argmax(action_probs[0])
         return action
 
-    def step(self, obs, action, reward, next_obs, done):
+    def step(self, obs, action, reward, next_obs, done, agent):
         self._step_count += 1
 
         # Save experience in replay memory
@@ -257,7 +257,7 @@ class DQNAgent(NNAgent):
     def episode_start(self):
         self.stats['eps_counter'] = 0
 
-    def episode_end(self):
+    def episode_end(self, agents):
         # Decay probability of taking random action
         self.stats['eps_val'] = max(self._eps_end, self._eps_decay * self.stats['eps_val'])
 
@@ -270,7 +270,7 @@ class DQNAgent(NNAgent):
 
 class DoubleDQNAgent(DQNAgent):
 
-    def step(self, obs, action, reward, next_obs, done):
+    def step(self, obs, action, reward, next_obs, done, agent):
         super().step(obs, action, reward, next_obs, done)
         if self._step_count % self._target_update == 0 or self._soft_update:
             # update the the target network with new weights
@@ -371,42 +371,48 @@ class PPOAgent(NNAgent):
 
     def __init__(self, state_size, action_size, params, memory_class, exploration, train_best, base_dir, checkpoint):
         super().__init__(state_size, action_size, params, memory_class, exploration=exploration, train_best=train_best, base_dir=base_dir, checkpoint=checkpoint)
+        self._last_value = None
 
     def act(self, obs):
         action, value = self._model.action_value(obs.reshape(1, -1))
+        self._last_value = value
         return action.numpy()[0]
 
-    def step(self, obs, action, reward, next_obs, done):
+    def step(self, obs, action, reward, next_obs, done, agent):
         self._step_count += 1
 
         _, policy_logits = self._model(obs.reshape(1, -1))
-        _, value = self._model.action_value(obs.reshape(1, -1))
-        self._memory.add(action, value[0], obs, reward, done, policy_logits)
 
-    def train(self):
-        actions, values, states, rewards, dones, probs = self._memory.sample()
+        if self._last_value is None:
+            _, self._last_value = self._model.action_value(obs.reshape(1, -1))
+        self._memory.add_agent_episode(agent, action, self._last_value[0], obs, reward, done, policy_logits)
+        self._last_value = None
 
-        _, next_value = self._model.action_value(states[-1].reshape(1, -1))
-        discounted_rewards, advantages = self._get_advantages(rewards, dones, values, next_value[0])
+    def train(self, agents):
+        for agent in agents:
+            actions, values, states, rewards, dones, probs = self._memory.retrieve_agent_episodes(agent)
 
-        actions = tf.squeeze(tf.stack(actions))
-        probs = tf.nn.softmax(tf.squeeze(tf.stack(probs)))
-        action_inds = tf.stack([tf.range(0, actions.shape[0]), tf.cast(actions, tf.int32)], axis=1)
-        
-        old_probs = tf.gather_nd(probs, action_inds),
-        ent_discount_val = 0.01
+            _, next_value = self._model.action_value(states[-1].reshape(1, -1))
+            discounted_rewards, advantages = self._get_advantages(rewards, dones, values, next_value[0])
 
-        with tf.GradientTape() as tape:
-            values, policy_logits = self._model(tf.stack(states))
-            act_loss = self._actor_loss(advantages, old_probs, action_inds, policy_logits)
-            ent_loss = self._entropy_loss(policy_logits, ent_discount_val)
-            c_loss = self._critic_loss(discounted_rewards, values)
-            tot_loss = act_loss + ent_loss + c_loss
-            self.stats['loss'] = tot_loss
+            actions = tf.squeeze(tf.stack(actions))
+            probs = tf.nn.softmax(tf.squeeze(tf.stack(probs)))
+            action_inds = tf.stack([tf.range(0, actions.shape[0]), tf.cast(actions, tf.int32)], axis=1)
+            
+            old_probs = tf.gather_nd(probs, action_inds),
+            ent_discount_val = 0.01
 
-        # Backpropagation
-        grads = tape.gradient(tot_loss, self._model.trainable_variables)
-        self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
+            with tf.GradientTape() as tape:
+                values, policy_logits = self._model(tf.stack(states))
+                act_loss = self._actor_loss(advantages, old_probs, action_inds, policy_logits)
+                ent_loss = self._entropy_loss(policy_logits, ent_discount_val)
+                c_loss = self._critic_loss(discounted_rewards, values)
+                tot_loss = act_loss + ent_loss + c_loss
+                self.stats['loss'] = tot_loss
+
+            # Backpropagation
+            grads = tape.gradient(tot_loss, self._model.trainable_variables)
+            self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
 
         self._memory.reset()
 
@@ -447,8 +453,8 @@ class PPOAgent(NNAgent):
     def episode_start(self):
         pass
 
-    def episode_end(self):
-        self.train()
+    def episode_end(self, agents):
+        self.train(agents)
 
     def _get_advantages(self, rewards, dones, values, next_value):
         discounted_rewards = np.array(rewards.tolist() + [next_value[0]])
