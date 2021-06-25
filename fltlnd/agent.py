@@ -434,7 +434,7 @@ class PPOAgent(NNAgent):
 
         self.surrogate_eps_clip = 0.1
         self.weight_loss = 0.5
-        self.weight_entropy = 0.01
+        self.weight_entropy = 0.1
 
         self._optimizer = Adam(learning_rate=self._learning_rate)
 
