@@ -53,7 +53,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def save(self, filename, overwrite=False):
+    def save(self, filename, overwrite=True):
         pass
 
     @abstractmethod
@@ -97,7 +97,7 @@ class RandomAgent(Agent):
     def step(self, obs, action, reward, next_obs, done, agent):
         pass
 
-    def save(self, filename, overwrite=False):
+    def save(self, filename, overwrite=True):
         pass
 
     def load(self, filename):
@@ -392,7 +392,7 @@ class PPOAgent(NNAgent):
             action_inds = tf.stack([tf.range(0, actions.shape[0]), tf.cast(actions, tf.int32)], axis=1)
             
             old_probs = tf.gather_nd(probs, action_inds),
-            ent_discount_val = 0.01
+            ent_discount_val = self._entropy_decay * self._entropy_weight
 
             with tf.GradientTape() as tape:
                 values, policy_logits = self._model(tf.stack(states))
@@ -408,7 +408,7 @@ class PPOAgent(NNAgent):
 
         self._memory.reset()
 
-    def save(self, filename, overwrite=False):
+    def save(self, filename, overwrite=True):
         self._model.save(filename, overwrite=overwrite)
 
     def load(self, filename):
@@ -427,14 +427,10 @@ class PPOAgent(NNAgent):
         }
 
         self._learning_rate = self._params['learning_rate']
-        self._clipping_loss_ratio = 0.1
-        self._entropy_loss_ratio = 0.2
-        self._positive_reward = False
-        self._target_update_alpha = 0.9
-
-        self.surrogate_eps_clip = 0.1
-        self.weight_loss = 0.5
-        self.weight_entropy = 0.1
+        self._surrogate_eps_clip =  self._params['surrogate_eps_clip'] #0.1
+        self._loss_weight =  self._params['loss_weight'] #0.5
+        self._entropy_weight =  self._params['entropy_weight'] #0.01
+        self._entropy_decay = 0.998
 
         self._optimizer = Adam(learning_rate=self._learning_rate)
 
@@ -479,7 +475,7 @@ class PPOAgent(NNAgent):
         return policy_loss
 
     def _critic_loss(self, discounted_rewards, value_est):
-        return tf.cast(tf.reduce_mean(keras.losses.mean_squared_error(discounted_rewards, value_est)) * self.weight_loss,
+        return tf.cast(tf.reduce_mean(keras.losses.mean_squared_error(discounted_rewards, value_est)) * self._loss_weight,
                     tf.float32)
 
 
