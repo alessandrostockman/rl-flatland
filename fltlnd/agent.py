@@ -1,24 +1,16 @@
 from abc import ABC, abstractmethod
 import os
+
 import numpy as np
-from numpy.core.arrayprint import dtype_short_repr
-from numpy.core.numeric import indices
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow_addons as tfa
-
-import tensorflow_probability as tfp
-
-# added for DDDQN
-from tensorflow.keras import layers
-
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Add
-from tensorflow.keras import backend as K
-
-from fltlnd.actorCriticNetwork import ActorCriticNetwork
-from fltlnd.replay_buffer import ReplayBuffer
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import layers
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Lambda, Add
+from tensorflow.keras import backend as K
+import tensorflow_addons as tfa
+import tensorflow_probability as tfp
 
 class Agent(ABC):
 

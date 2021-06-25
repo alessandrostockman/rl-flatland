@@ -1,12 +1,11 @@
+from abc import ABC, abstractmethod
+import os
 import itertools
 import json
 from datetime import datetime
 from collections import deque
 
-from abc import ABC, abstractmethod
-import os
 import numpy as np
-
 import tensorflow as tf
 from tensorboard.plugins.hparams import api as hp
 import wandb

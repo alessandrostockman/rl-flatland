@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.predictions import ShortestPathPredictorForRailEnv
-from fltlnd.predict import StochasticPathPredictor
 from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 

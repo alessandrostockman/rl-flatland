@@ -5,10 +5,7 @@ import json
 import time
 import random
 from flatland.envs import malfunction_generators as mal_gen
-import matplotlib.pyplot as plt
 import numpy as np
-
-from collections import deque
 
 from flatland.envs.rail_env import RailEnv
 from flatland.envs.rail_generators import sparse_rail_generator

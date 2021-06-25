@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-
-import random
 import math
 from flatland.envs.rail_trainrun_data_structures import Waypoint
 
@@ -10,12 +7,8 @@ from flatland.core.env_prediction_builder import PredictionBuilder
 from flatland.envs.agent_utils import RailAgentStatus
 from flatland.envs.distance_map import DistanceMap
 from flatland.envs.rail_env import RailEnvActions
-from flatland.envs.rail_env_shortest_paths import get_shortest_paths, get_valid_move_actions_
+from flatland.envs.rail_env_shortest_paths import get_valid_move_actions_
 from flatland.utils.ordered_set import OrderedSet
-
-from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.predictions import ShortestPathPredictorForRailEnv
-from fltlnd.utils import split_tree_into_feature_groups, norm_obs_clip
 
 
 class StochasticPathPredictor(PredictionBuilder):

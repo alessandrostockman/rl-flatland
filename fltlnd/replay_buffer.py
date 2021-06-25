@@ -1,10 +1,10 @@
 from abc import abstractclassmethod, abstractmethod
-
-from tensorflow.python.ops.gen_math_ops import batch_mat_mul
-from fltlnd.utils import SumTree
 import random
 from collections import deque
+
 import numpy as np
+
+from fltlnd.utils import SumTree
 
 class Buffer:
 
