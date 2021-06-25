@@ -14,7 +14,7 @@
     },
     "trn": {
         "memory_size": 100000,
-        "batch_size": 32,
+        "batch_size": 64,
         "update_every": 8,
         "learning_rate": 1e-4,
         "tau": 5e-2,
@@ -28,7 +28,10 @@
         "target_update": 10000,
         "soft_update": true,
         "noisy_net": false,
-        "env": "t1.l1"
+        "surrogate_eps_clip": 0.1,
+        "loss_weight": 0.5,
+        "entropy_weight": 0.01,
+        "env": "t1.l0"
     },
     "log": {
         "log_dir": "tmp/logs",
