@@ -381,6 +381,8 @@ class PPOAgent(NNAgent):
         self._last_value = None
 
     def train(self, agents):
+        self._entropy_weight = self._entropy_decay * self._entropy_weight
+        
         for agent in agents:
             actions, values, states, rewards, dones, probs = self._memory.retrieve_agent_episodes(agent)
 
@@ -392,12 +394,11 @@ class PPOAgent(NNAgent):
             action_inds = tf.stack([tf.range(0, actions.shape[0]), tf.cast(actions, tf.int32)], axis=1)
             
             old_probs = tf.gather_nd(probs, action_inds),
-            ent_discount_val = self._entropy_decay * self._entropy_weight
 
             with tf.GradientTape() as tape:
                 values, policy_logits = self._model(tf.stack(states))
                 act_loss = self._actor_loss(advantages, old_probs, action_inds, policy_logits)
-                ent_loss = self._entropy_loss(policy_logits, ent_discount_val)
+                ent_loss = self._entropy_loss(policy_logits, self._entropy_weight)
                 c_loss = self._critic_loss(discounted_rewards, values)
                 tot_loss = act_loss + ent_loss + c_loss
                 self.stats['loss'] = tot_loss
@@ -470,7 +471,7 @@ class PPOAgent(NNAgent):
 
         policy_loss = -tf.reduce_mean(tf.math.minimum(
             ratio * advantages,
-            tf.clip_by_value(ratio, 1.0 - self.surrogate_eps_clip, 1.0 + self.surrogate_eps_clip) * advantages
+            tf.clip_by_value(ratio, 1.0 - self._surrogate_eps_clip, 1.0 + self._surrogate_eps_clip) * advantages
         ))
         return policy_loss
 
