@@ -1,6 +1,6 @@
 {
     "sys": {
-        "seed": 42,
+        "seed": 666,
         "base_dir": "",
         "obs_class": "TreeObs",
         "agent_class": "DDDQNAgent",
@@ -31,7 +31,7 @@
         "surrogate_eps_clip": 0.1,
         "loss_weight": 0.5,
         "entropy_weight": 0.01,
-        "env": "t1.l0"
+        "env": "t1.l1"
     },
     "log": {
         "log_dir": "tmp/logs",

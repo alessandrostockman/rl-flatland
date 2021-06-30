@@ -1,4 +1,15 @@
 {
+    "t1.lx": {
+        "n_agents": 1,
+        "x_dim": 30,
+        "y_dim": 30,
+        "n_cities": 2,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 2,
+        "min_malfunction_interval": 10000,
+        "grid_mode": true,
+        "malfunction_duration": [20, 50]
+    },
     "t1.l0": {
         "n_agents": 3,
         "x_dim": 30,
@@ -17,7 +28,7 @@
         "n_cities": 2,
         "max_rails_between_cities": 2,
         "max_rails_in_city": 3,
-        "min_malfunction_interval": 50,
+        "min_malfunction_interval": 1500,
         "grid_mode": false,
         "malfunction_duration": [20, 50]
     },
@@ -28,7 +39,7 @@
         "n_cities": 5,
         "max_rails_between_cities": 2,
         "max_rails_in_city": 3,
-        "min_malfunction_interval": 50,
+        "min_malfunction_interval": 1500,
         "grid_mode": false,
         "malfunction_duration": [20, 50]
     },
@@ -39,7 +50,7 @@
         "n_cities": 9,
         "max_rails_between_cities": 4,
         "max_rails_in_city": 3,
-        "min_malfunction_interval": 50,
+        "min_malfunction_interval": 1500,
         "grid_mode": false,
         "malfunction_duration": [20, 50]
     }
