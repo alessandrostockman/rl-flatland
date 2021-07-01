@@ -19,26 +19,19 @@ The execution can be altered by changing some configuration files:
 
 ### How to run
 
-`python main.py [-E/--logging LOGGING] [-v/--verbosity VERBOSITY] [-P/--plot] [-R/--run RUN]`
-
-- `--logging: Defines logging mode ["file", "console", "none"]`
-- `--verbosity: Level of verbosity of logs ["low", "high"]`
-- `--plot: If specified plots the resulting image at the end of execution (when running map)`
-- `--run: Chooses the example to run ["linear", "integer", "map"]`
-
 `python main.py [-E / --episodes EPISODES] [-R / --rendering]  [-S / --synclog] [-V / --verbose] [-T / --training TRAINING_MODE] [-C / --checkpoint CHECKPOINT] [-X / --seed] [-W / --world WORLD]`
 
-- `--episodes: Number of episodes to run`
-- `--rendering: Renders the environment`
-- `--synclog: Syncs logs on the cloud`
-- `--verbose: Prints results on the console`
-- `--training: Training modes: 
-    - `debug - Doesn't save checkpoints`
-    - `eval - Executes the environment without training the model`
-    - `tuning - Enables tuning of hyperparameters`
-    - `best - Loads the best checkpoint for the chosen model (checkpoints/{model}) and trains it` 
-    - `fresh - Starts the training without loading a checkpoint`
-- `--checkpoint: Cusotm checkpoint path`
-- `--seed: Custom seed for current execution, overrides the defined setup`
-- `--world: Custom environment for execution, overrides the defined setup`
+- `--episodes`: Number of episodes to run
+- `--rendering`: Renders the environment
+- `--synclog`: Syncs logs on the cloud
+- `--verbose`: Prints results on the console
+- `--training`: Training modes: 
+    - debug - Doesn't save checkpoints
+    - eval - Executes the environment without training the model
+    - tuning - Enables tuning of hyperparameters
+    - best - Loads the best checkpoint for the chosen model (checkpoints/{model}) and trains it
+    - fresh - Starts the training without loading a checkpoint
+- `--checkpoint`: Cusotm checkpoint path
+- `--seed`: Custom seed for current execution, overrides the defined setup
+- `--world`: Custom environment for execution, overrides the defined setup
  
