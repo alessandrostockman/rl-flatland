@@ -6,7 +6,7 @@ Core aspects of the project:
 - DDDQN with Noisy Networks and Prioritized Experience Replay
 - PPO
 
-![Execution Demo](https://github.com/alessandrostockman/rl-flatland/blob/main/res/demo.gif)
+![Execution Demo](https://github.com/alessandrostockman/rl-flatland/blob/master/res/demo.gif)
 
 ## Usage
 
