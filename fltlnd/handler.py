@@ -237,7 +237,8 @@ class EnvHandler:
                 number_of_agents=self.n_agents,
                 obs_builder_object=self._obs_builder,
                 malfunction_generator=mal_gen.ParamMalfunctionGen(self.mal_params),
-                close_following=False
+                close_following=False,
+                random_seed=seed
             )
         except AttributeError:
             self.env = RailEnv(
@@ -253,7 +254,8 @@ class EnvHandler:
                 schedule_generator=sparse_schedule_generator(),
                 number_of_agents=self.n_agents,
                 obs_builder_object=self._obs_builder,
-                malfunction_generator_and_process_data=mal_gen.malfunction_from_params(self.mal_params)
+                malfunction_generator_and_process_data=mal_gen.malfunction_from_params(self.mal_params),
+                random_seed=seed
             )
 
         if self._rendering:
@@ -282,7 +284,7 @@ class EnvHandler:
             info["deadlocks"][agent] = deadlocks[agent]
 
         if self._rendering:
-            self._renderer.render_env(show=True, show_observations=True, show_predictions=False)
+            self._renderer.render_env(show=True, show_observations=False, show_predictions=False)
 
         return next_obs, all_rewards, done, info
 
