@@ -1,6 +1,6 @@
 {
     "sys": {
-        "seed": 666,
+        "seed": 42,
         "base_dir": "",
         "obs_class": "TreeObs",
         "agent_class": "DDDQNAgent",

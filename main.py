@@ -8,8 +8,12 @@ from fltlnd.handler import ExcHandler
 def main(episodes: int, training: str, rendering: bool, checkpoint: Optional[str], synclog: bool, verbose: bool, seed, world):
     with open("parameters/setup.json") as json_file:
         parameters = json.load(json_file)
-        parameters['sys']['seed'] = int(seed)
-        parameters['trn']['env'] = world
+
+        if seed is not None:
+            parameters['sys']['seed'] = int(seed)
+
+        if world is not None:
+            parameters['trn']['env'] = world
 
     ex = ExcHandler(parameters, {
         'eval': TrainingMode.EVAL,
@@ -39,8 +43,8 @@ if __name__ == "__main__":
         fresh - Starts the training without loading a checkpoint
     ''', default="debug", choices=['debug', 'eval', 'tuning', 'best', 'fresh'])
     parser.add_argument('-C', '--checkpoint', dest="checkpoint", help="Cusotm checkpoint path", default=None)
-    parser.add_argument('-X', '--seed', dest="seed", help="", default=42)
-    parser.add_argument('-W', '--world', dest="world", help="", default="t1.lx")
+    parser.add_argument('-X', '--seed', dest="seed", help="Custom seed for current execution, overrides the defined setup", default=None)
+    parser.add_argument('-W', '--world', dest="world", help="Custom environment for execution, overrides the defined setup", default=None)
     args = parser.parse_args()
 
     main(args.episodes, args.training, args.rendering, args.checkpoint, args.synclog, args.verbose, args.seed, args.world)
